@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
@@ -19,8 +19,9 @@
 <header class="main-header">
   <div class="container header-row">
     <div class="header-left">
+      <p class="eyebrow">FX-aware, offline-first</p>
       <h1>UAE Property Financing</h1>
-      <p class="subtitle">Compare assumptions, visualize cashflow, and calculate returns.</p>
+      <p class="subtitle">Compare two options side-by-side, visualize cashflow, and calculate returns.</p>
     </div>
     <div class="header-right">
       <div class="today-pill">
@@ -29,22 +30,27 @@
       </div>
     </div>
   </div>
+  <div class="container fx-strip">
+    <div class="fx-chip" id="fx-eur-aed">1 EUR = 0 AED</div>
+    <div class="fx-chip" id="fx-eur-inr">1 EUR = 0 INR</div>
+    <div class="fx-chip" id="fx-aed-inr">1 AED = 0 INR</div>
+    <div class="fx-chip muted-chip" id="fx-note">Exchange rates are constant per scenario to keep returns comparable.</div>
+  </div>
 </header>
 
 <main class="container main-content">
 
   <section class="scenarios-section">
-    <h2><i class="fas fa-sliders-h"></i> Scenarios Setup</h2>
-    <p class="muted">
-      Compare two options (A and B) side-by-side. All calculations run locally and auto-save.
-    </p>
-
-    <div class="toolbar">
-      <button id="btn-reset" class="btn-secondary" title="Clear all data and reset to defaults"><i class="fas fa-redo"></i> Reset</button>
-      <button id="btn-copy-a-to-b" class="btn-secondary" title="Copy all values from Scenario A to Scenario B"><i class="fas fa-copy"></i> Copy A &rarr; B</button>
-      <button id="btn-export" class="btn-secondary" title="Download scenarios data as JSON file"><i class="fas fa-file-export"></i> Export</button>
-      <span class="autosave-badge" id="autosave-badge">Auto-saved</span>
+    <div class="section-heading">
+      <h2><i class="fas fa-sliders-h"></i> Scenarios Setup</h2>
+      <div class="toolbar">
+        <button id="btn-reset" class="btn-secondary" title="Clear all data and reset to defaults"><i class="fas fa-redo"></i> Reset</button>
+        <button id="btn-copy-a-to-b" class="btn-secondary" title="Copy all values from Scenario A to Scenario B"><i class="fas fa-copy"></i> Copy A → B</button>
+        <button id="btn-export" class="btn-secondary" title="Download scenarios data as JSON file"><i class="fas fa-file-export"></i> Export</button>
+        <span class="autosave-badge" id="autosave-badge">Auto-saved</span>
+      </div>
     </div>
+    <p class="muted">Two cards keep the comparison readable. Inputs validate as you type; hover any label to see an explanation.</p>
 
     <div id="scenarios" class="scenario-grid-2"></div>
   </section>
@@ -53,12 +59,12 @@
     <h2><i class="fas fa-chart-line"></i> Performance Comparison</h2>
     <div class="card comparison-card">
       <div class="card-body">
-        
+
         <div class="chart-container">
             <h3 class="chart-title">Annual Cashflow over Hold Period (EUR)</h3>
             <canvas id="cashflow-chart"></canvas>
         </div>
-        
+
         <h3 class="chart-title mt-2">Key Metrics Table</h3>
         <div class="table-wrap">
           <table class="compare-table" id="compare-table">
@@ -77,6 +83,11 @@
         </p>
       </div>
     </div>
+  </section>
+
+  <section class="bottom-line-section">
+    <h2><i class="fas fa-calculator"></i> Bottom Line Snapshot</h2>
+    <div class="bottom-grid" id="bottom-line"></div>
   </section>
 
   <section class="quotes-section">
