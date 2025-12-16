@@ -1,10 +1,15 @@
 /*********************************
- * UAE Property Financing (v2.0 UX Overhaul)
+ * UAE Property Financing (v2.1 UX Overhaul)
  * - Simplified to 2 scenarios (A/B)
- * - Collapsible form sections
- * - Chart.js visualization for Cashflow
- * - Improved comparison with 'best' indicators
+ * - Collapsible form sections & Tooltips
+ * - Sticky Footer (AED/EUR/INR)
+ * - Live EUR conversion helpers
  *********************************/
+
+/* ---------- Configuration ---------- */
+const STORAGE_KEY = "uaePropertyFinancing.scenarios.v2";
+const SCENARIO_KEYS = ["A", "B"];
+const FX_INR_PER_AED = 23.0; // Hardcoded estimate for INR conversion
 
 /* ---------- Date (top-right) ---------- */
 (function setToday() {
@@ -34,21 +39,17 @@ let currentQuoteIndex = -1;
 function showRandomQuote() {
   if (!tamilQuoteEl || !englishMeaningEl) return;
   let index;
-  do {
-    index = Math.floor(Math.random() * quotes.length);
-  } while (index === currentQuoteIndex && quotes.length > 1);
+  do { index = Math.floor(Math.random() * quotes.length); } while (index === currentQuoteIndex && quotes.length > 1);
 
   currentQuoteIndex = index;
   
-  // Fade out
+  // Subtle fade for better UX
   tamilQuoteEl.style.opacity = 0;
   englishMeaningEl.style.opacity = 0;
 
   setTimeout(() => {
-    // Update content
     tamilQuoteEl.textContent = `"${quotes[index].tamil}"`;
     englishMeaningEl.textContent = quotes[index].english;
-    // Fade in
     tamilQuoteEl.style.opacity = 1;
     englishMeaningEl.style.opacity = 1;
   }, 250);
@@ -57,47 +58,21 @@ if (newQuoteBtn) newQuoteBtn.addEventListener("click", showRandomQuote);
 showRandomQuote();
 
 
-/* ---------- State & defaults ---------- */
-const STORAGE_KEY = "uaePropertyFinancing.scenarios.v2"; // Changed key
-const SCENARIO_KEYS = ["A", "B"]; // Simplified to 2 scenarios
-
+/* ---------- State & defaults (from v2 UX) ---------- */
 const DEFAULTS = {
   A: {
-    name: "Dubai Investment (Mortgage)",
-    emirate: "Dubai",
-    unitType: "1BHK",
-    offPlan: false,
-
-    fxAedPerEur: 4.00, // 1 EUR = X AED
-    purchasePriceAed: 800000,
-
-    annualRentAed: 72000,
-    vacancyPct: 5,
-    rentGrowthPct: 3,
-    expenseGrowthPct: 2,
-
-    // Upfront costs
-    regFeePct: 4.0, regAdminAed: 580, agentPct: 2.0, vatPct: 5.0,
-    trusteeFeeAed: 4000, nocFeeAed: 1500, otherUpfrontAed: 0, furnitureAed: 0,
-
-    // Operating
+    name: "Dubai Investment (Mortgage)", emirate: "Dubai", unitType: "1BHK", offPlan: false,
+    fxAedPerEur: 4.00, purchasePriceAed: 800000, annualRentAed: 72000, vacancyPct: 5, rentGrowthPct: 3, expenseGrowthPct: 2,
+    regFeePct: 4.0, regAdminAed: 580, agentPct: 2.0, vatPct: 5.0, trusteeFeeAed: 4000, nocFeeAed: 1500, otherUpfrontAed: 0, furnitureAed: 0,
     serviceChargesAedYr: 12000, mgmtPct: 8, maintPct: 5, insuranceAedYr: 800, otherOpAedYr: 0,
-
-    // Financing
-    financingMode: "UAE Mortgage", // Cash | UAE Mortgage | NL Loan
-    uaeDownPct: 25, uaeRatePct: 5.5, uaeTermYrs: 25,
+    financingMode: "UAE Mortgage", uaeDownPct: 25, uaeRatePct: 5.5, uaeTermYrs: 25,
     uaeBankFeePct: 1.0, uaeBankFeeAed: 0, uaeMortgageRegPct: 0.25, uaeMortgageRegAdminAed: 290,
-
-    nlLoanAmountEur: 0, nlRatePct: 5.0, nlTermYrs: 20, nlRepayment: "Amortizing",
-    nlBankFeePct: 0.0, nlBankFeeEur: 0.0,
-
-    // Exit
+    nlLoanAmountEur: 0, nlRatePct: 5.0, nlTermYrs: 20, nlRepayment: "Amortizing", nlBankFeePct: 0.0, nlBankFeeEur: 0.0,
     holdYrs: 7, appreciationPct: 3.0, sellAgentPct: 2.0, sellVatPct: 5.0, sellOtherAed: 0
   },
   B: null
 };
 
-// Scenario B Default
 DEFAULTS.B = JSON.parse(JSON.stringify(DEFAULTS.A));
 DEFAULTS.B.name = "Abu Dhabi Cash (Lower Fees)";
 DEFAULTS.B.emirate = "Abu Dhabi";
@@ -109,18 +84,14 @@ DEFAULTS.B.annualRentAed = 65000;
 
 
 function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
-
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return clone(DEFAULTS);
     const parsed = JSON.parse(raw);
-    // Check if structure is valid for v2 (A and B exist)
     if (!parsed || !parsed.A || !parsed.B) return clone(DEFAULTS);
     return parsed;
-  } catch {
-    return clone(DEFAULTS);
-  }
+  } catch { return clone(DEFAULTS); }
 }
 
 function saveState(state) {
@@ -144,22 +115,25 @@ function toPct(v) { return num(v) / 100; }
 
 function fmtMoney(v, cur) {
   const x = num(v);
-  const options = { maximumFractionDigits: (Math.abs(x) < 100 && cur === "EUR") ? 2 : 0 };
+  // EUR has 2 decimal places, others generally 0 for large amounts
+  const options = { maximumFractionDigits: (cur === "EUR") ? 2 : 0 };
   return x.toLocaleString("en-GB", options) + (cur ? " " + cur : "");
 }
+
 function fmtCompact(v) {
   const x = num(v);
   if (x >= 1000000) return (x/1000000).toFixed(2) + "M";
   if (x >= 1000) return (x/1000).toFixed(1) + "k";
   return x.toFixed(0);
 }
+
 function fmtPct(v) { return num(v).toLocaleString("en-GB", { maximumFractionDigits: 2 }) + "%"; }
 function fmtIrr(v) { return Number.isFinite(v) ? fmtPct(v * 100) : "n/a"; }
 
 function defaultRegFeePct(emirate) { return emirate === "Abu Dhabi" ? 2.0 : 4.0; }
 function defaultMortgageRegPct(emirate) { return emirate === "Abu Dhabi" ? 0.10 : 0.25; }
 
-/* ----- Finance math (borrowed from original for accuracy) ----- */
+/* ----- Finance Math (simplified for this view) ----- */
 function pmt(principal, annualRatePct, termYears) {
   const P = num(principal);
   const r = toPct(annualRatePct) / 12;
@@ -184,6 +158,7 @@ function remainingBalance(principal, annualRatePct, termYears, monthsPaid) {
 }
 
 function irr(cashflows) {
+  // Simple IRR approximation (using code from previous step)
   if (!cashflows || cashflows.length < 2) return NaN;
   const hasPos = cashflows.some(c => c > 0);
   const hasNeg = cashflows.some(c => c < 0);
@@ -208,16 +183,17 @@ function irr(cashflows) {
   return x;
 }
 
-/* ----- Scenario calculation (with full annual cashflow array for chart) ----- */
+/* ----- Core Calculation ----- */
 function calcScenario(s) {
   const fx = Math.max(0.0001, num(s.fxAedPerEur));
   const aedToEur = (aed) => num(aed) / fx;
   const eurToAed = (eur) => num(eur) * fx;
 
   const priceAed = num(s.purchasePriceAed);
+  const grossRentAed = num(s.annualRentAed);
   const holdYrs = Math.max(1, Math.round(num(s.holdYrs)));
 
-  // 1. Upfront & Financing
+  // 1. Upfront & Financing (Same as previous, calculates loan, downpayment, and fees)
   const regFeeAed = priceAed * toPct(s.regFeePct);
   const agentFeeAed = priceAed * toPct(s.agentPct);
   const agentVatAed = agentFeeAed * toPct(s.vatPct);
@@ -255,7 +231,6 @@ function calcScenario(s) {
   const totalAcqCostAed = priceAed + upfrontAed;
   const totalAcqCostEur = aedToEur(totalAcqCostAed);
 
-  // Cash invested (Year 0)
   let cashInvestedEur = totalAcqCostEur;
   if (s.financingMode === "UAE Mortgage") {
     const downPaymentAed = priceAed * toPct(s.uaeDownPct);
@@ -264,14 +239,9 @@ function calcScenario(s) {
     cashInvestedEur = Math.max(0, totalAcqCostEur - loanEur) + bankFeesEur;
   }
   
-  // 2. Yearly Cashflows
-  const cashflowsEur = [-cashInvestedEur]; // Year 0
-  const annualCFs = []; // For charting
-
-  const grossRent1 = num(s.annualRentAed);
+  // 2. Year 1 Operating
   const vacancy = toPct(s.vacancyPct);
-  const rentGrowth = toPct(s.rentGrowthPct);
-  const expGrowth = toPct(s.expenseGrowthPct);
+  const collectedRent1 = grossRentAed * (1 - vacancy);
 
   const service1 = num(s.serviceChargesAedYr);
   const insurance1 = num(s.insuranceAedYr);
@@ -279,163 +249,75 @@ function calcScenario(s) {
   const mgmtPct = toPct(s.mgmtPct);
   const maintPct = toPct(s.maintPct);
   
-  let noiAedYr1 = 0;
-  let annualCashflowEurYr1 = 0;
-
-  for (let y = 1; y <= holdYrs; y++) {
-    const rentY = grossRent1 * Math.pow(1 + rentGrowth, y - 1);
-    const collectedRentY = rentY * (1 - vacancy);
-
-    const serviceY = service1 * Math.pow(1 + expGrowth, y - 1);
-    const insuranceY = insurance1 * Math.pow(1 + expGrowth, y - 1);
-    const otherOpY = otherOp1 * Math.pow(1 + expGrowth, y - 1);
-
-    const opexY = serviceY + insuranceY + otherOpY + (collectedRentY * mgmtPct) + (collectedRentY * maintPct);
-    const noiY = collectedRentY - opexY;
+  const opex1 = service1 + insurance1 + otherOp1 + (collectedRent1 * mgmtPct) + (collectedRent1 * maintPct);
+  const noiAedYr1 = collectedRent1 - opex1;
     
-    if (y === 1) noiAedYr1 = noiY;
+  let debtServiceEurYr1 = 0;
+  if (s.financingMode === "UAE Mortgage") debtServiceEurYr1 = aedToEur(annualDebtServiceAed);
+  else if (s.financingMode === "NL Loan") debtServiceEurYr1 = annualDebtServiceEur;
 
-    let debtY_Eur = 0;
-    if (s.financingMode === "UAE Mortgage") debtY_Eur = aedToEur(annualDebtServiceAed);
-    else if (s.financingMode === "NL Loan") debtY_Eur = annualDebtServiceEur;
-
-    const cashflowY_Eur = aedToEur(noiY) - debtY_Eur;
-    if (y === 1) annualCashflowEurYr1 = cashflowY_Eur;
-    
-    annualCFs.push(cashflowY_Eur); // Store for chart
-    cashflowsEur.push(cashflowY_Eur); // Store for IRR
-  }
-
-  // 3. Exit (Reversion)
-  const sellPriceAed = priceAed * Math.pow(1 + toPct(s.appreciationPct), holdYrs);
-  const sellAgentAed = sellPriceAed * toPct(s.sellAgentPct);
-  const sellVatAed = sellAgentAed * toPct(s.sellVatPct);
-  const sellOtherAed = num(s.sellOtherAed);
-
-  const saleNetAedBeforeDebt = sellPriceAed - sellAgentAed - sellVatAed - sellOtherAed;
-  
-  let remainingLoanAtExitAed = 0;
-  let remainingLoanAtExitEur = 0;
-  const monthsHeld = Math.round(holdYrs * 12);
-
-  if (s.financingMode === "UAE Mortgage") {
-    remainingLoanAtExitAed = remainingBalance(loanAed, s.uaeRatePct, s.uaeTermYrs, monthsHeld);
-  } else if (s.financingMode === "NL Loan") {
-    if (s.nlRepayment === "Interest-only") {
-      remainingLoanAtExitEur = loanEur;
-    } else {
-      remainingLoanAtExitEur = remainingBalance(loanEur, s.nlRatePct, s.nlTermYrs, monthsHeld);
-    }
-  }
-
-  let debtPayoffEur = aedToEur(remainingLoanAtExitAed) + remainingLoanAtExitEur;
-  const saleProceedsEur = aedToEur(saleNetAedBeforeDebt) - debtPayoffEur;
-  
-  // Add reversion to the last period cashflow
-  cashflowsEur[cashflowsEur.length - 1] += saleProceedsEur;
-  
-  // Final calculations
-  const noiEurYr1 = aedToEur(noiAedYr1);
+  const annualCashflowEurYr1 = aedToEur(noiAedYr1) - debtServiceEurYr1;
   const monthlyCashflowEur = annualCashflowEurYr1 / 12;
   const monthlyCashflowAed = eurToAed(monthlyCashflowEur);
+
+  // 3. IRR Calculation
+  const rentGrowth = toPct(s.rentGrowthPct);
+  const expGrowth = toPct(s.expenseGrowthPct);
+  const appreciation = toPct(s.appreciationPct);
+  const cashflowsEur = [-cashInvestedEur]; // Year 0
+
+  for (let y = 1; y <= holdYrs; y++) {
+    const rentY = grossRentAed * Math.pow(1 + rentGrowth, y - 1);
+    const collectedRentY = rentY * (1 - vacancy);
+    const serviceY = num(s.serviceChargesAedYr) * Math.pow(1 + expGrowth, y - 1);
+    const opexY = serviceY + num(s.insuranceAedYr) * Math.pow(1 + expGrowth, y - 1) + num(s.otherOpAedYr) * Math.pow(1 + expGrowth, y - 1) + 
+                  (collectedRentY * mgmtPct) + (collectedRentY * maintPct);
+    const noiY = collectedRentY - opexY;
+    
+    let debtY_Eur = (s.financingMode === "UAE Mortgage") ? aedToEur(annualDebtServiceAed) : annualDebtServiceEur;
+    
+    cashflowsEur.push(aedToEur(noiY) - debtY_Eur);
+  }
+
+  // Reversion (Simplified: assumes all loan is paid off if term is shorter than hold)
+  const sellPriceAed = priceAed * Math.pow(1 + appreciation, holdYrs);
+  const sellAgentAed = sellPriceAed * toPct(s.sellAgentPct);
+  const sellVatAed = sellAgentAed * toPct(s.sellVatPct);
+  const saleNetAedBeforeDebt = sellPriceAed - sellAgentAed - sellVatAed - num(s.sellOtherAed);
   
+  let remainingLoanAed = 0;
+  if (s.financingMode === "UAE Mortgage") {
+    remainingLoanAed = remainingBalance(loanAed, s.uaeRatePct, s.uaeTermYrs, holdYrs * 12);
+  } else if (s.financingMode === "NL Loan") {
+    const remainingLoanEur = (s.nlRepayment === "Interest-only") 
+      ? loanEur 
+      : remainingBalance(loanEur, s.nlRatePct, s.nlTermYrs, holdYrs * 12);
+    remainingLoanAed = eurToAed(remainingLoanEur);
+  }
+
+  const netSaleAed = saleNetAedBeforeDebt - remainingLoanAed;
+  const netSaleEur = aedToEur(netSaleAed);
+
+  // Add reversion to the last period cashflow
+  cashflowsEur[cashflowsEur.length - 1] += netSaleEur;
+  
+  // Final metrics
+  const noiEurYr1 = aedToEur(noiAedYr1);
   const netYield = totalAcqCostEur > 0 ? (noiEurYr1 / totalAcqCostEur) : NaN;
   const cashOnCash = cashInvestedEur > 0 ? (annualCashflowEurYr1 / cashInvestedEur) : NaN;
   const irrVal = irr(cashflowsEur);
 
   return {
+    priceAed, grossRentAed,
     totalAcqCostAed, totalAcqCostEur,
     cashInvestedEur,
     noiAedYr1, noiEurYr1,
-    annualDebtServiceEur,
+    annualDebtServiceEur: debtServiceEurYr1,
     monthlyCashflowEur, monthlyCashflowAed,
     netYield, cashOnCash, irr: irrVal,
-    annualCFs, holdYrs,
-    label: s.name // Include name for chart
+    fx: fx,
+    label: s.name // Include name for footer
   };
-}
-
-/* ----- Charting ----- */
-let cashflowChart = null;
-
-function renderCharts(results) {
-    const ctx = document.getElementById('cashflow-chart').getContext('2d');
-    const labels = Array.from({ length: results.A.holdYrs }, (_, i) => `Year ${i + 1}`);
-
-    // Ensure chart arrays are the same length for comparison
-    const maxHoldYrs = Math.max(results.A.holdYrs, results.B.holdYrs);
-    const dataA = results.A.annualCFs.slice(0, maxHoldYrs).map(cf => Math.round(cf));
-    const dataB = results.B.annualCFs.slice(0, maxHoldYrs).map(cf => Math.round(cf));
-    
-    // Pad the shorter array with 0s if necessary for comparison
-    while (dataA.length < maxHoldYrs) dataA.push(0);
-    while (dataB.length < maxHoldYrs) dataB.push(0);
-    
-    // Recreate labels if hold periods were different
-    const chartLabels = Array.from({ length: maxHoldYrs }, (_, i) => `Year ${i + 1}`);
-
-    // Determine max/min for better y-axis scaling
-    const allData = [...dataA, ...dataB];
-    const maxVal = Math.max(...allData, 0);
-    const minVal = Math.min(...allData, 0);
-    const padding = (maxVal - minVal) * 0.1;
-
-    if (cashflowChart) {
-        cashflowChart.destroy();
-    }
-
-    cashflowChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: chartLabels,
-            datasets: [
-                {
-                    label: results.A.label,
-                    data: dataA,
-                    backgroundColor: 'rgba(255, 140, 0, 0.6)', // Primary Color
-                    borderColor: 'rgba(255, 140, 0, 1)',
-                    borderWidth: 1,
-                    borderRadius: 3
-                },
-                {
-                    label: results.B.label,
-                    data: dataB,
-                    backgroundColor: 'rgba(0, 168, 150, 0.6)', // Teal Color
-                    borderColor: 'rgba(0, 168, 150, 1)',
-                    borderWidth: 1,
-                    borderRadius: 3
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    grid: { display: false }
-                },
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Cashflow (EUR)' },
-                    min: minVal - padding,
-                    max: maxVal + padding,
-                    ticks: {
-                        callback: function(value) { return fmtCompact(value) + '€'; }
-                    }
-                }
-            },
-            plugins: {
-                legend: { position: 'top' },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `${context.dataset.label}: ${fmtMoney(context.parsed.y, 'EUR')}`;
-                        }
-                    }
-                }
-            }
-        }
-    });
 }
 
 /* ----- Rendering & Events ----- */
@@ -451,27 +333,37 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
+// Function to generate form elements (kept from v2 UX for tooltips/collapsibility)
 function inputField(key, field, labelText, value, type="number", step="any", tooltip="") {
-  const isChecked = type === "checkbox" && value;
-  const inputHtml = (type === "checkbox") 
-    ? `<input id="${key}-${field}" data-scenario="${key}" data-field="${field}" type="checkbox" ${isChecked ? "checked" : ""} />`
-    : `<input id="${key}-${field}" data-scenario="${key}" data-field="${field}" type="${type}" step="${step}" value="${escapeHtml(value)}" title="${escapeHtml(tooltip)}" />`;
-  
-  if (type === "checkbox") {
-      return `
-        <div class="inline">
-            ${inputHtml}
-            <label for="${key}-${field}">${labelText}</label>
-        </div>
-      `;
-  }
+    const isChecked = type === "checkbox" && value;
+    const isAedField = labelText.includes("(AED)") || labelText.includes("(% of loan)") || labelText.includes("(% of Rent)");
+    
+    let inputHtml = "";
+    if (type === "checkbox") {
+        inputHtml = `<input id="${key}-${field}" data-scenario="${key}" data-field="${field}" type="checkbox" ${isChecked ? "checked" : ""} />`;
+    } else {
+        inputHtml = `<input id="${key}-${field}" data-scenario="${key}" data-field="${field}" type="${type}" step="${step}" value="${escapeHtml(value)}" title="${escapeHtml(tooltip)}" />`;
+    }
 
-  return `
-    <div class="input-group">
-      <label for="${key}-${field}" data-tooltip="${escapeHtml(tooltip)}">${labelText}</label>
-      ${inputHtml}
-    </div>
-  `;
+    let helperHtml = "";
+    if (isAedField && type === "number" && !labelText.includes("(%")) {
+        // Only add helper for direct AED input fields
+        helperHtml = `<span class="currency-helper" id="hint-${key}-${field}"></span>`;
+    }
+
+    if (type === "checkbox") {
+        return `<div class="inline">${inputHtml}<label for="${key}-${field}">${labelText}</label></div>`;
+    }
+
+    return `
+      <div class="input-group">
+        <label for="${key}-${field}" data-tooltip="${escapeHtml(tooltip)}">${labelText}</label>
+        <div class="input-wrap">
+          ${inputHtml}
+          ${helperHtml}
+        </div>
+      </div>
+    `;
 }
 
 function selectField(key, field, labelText, value, options, tooltip="") {
@@ -484,9 +376,8 @@ function selectField(key, field, labelText, value, options, tooltip="") {
   `;
 }
 
-
+// Function to render the scenario cards (kept collapsible sections)
 function scenarioCardHtml(key, s) {
-  const isA = key === 'A';
   return `
   <div class="card scenario-card" data-scenario="${key}">
     <div class="card-header">
@@ -499,9 +390,7 @@ function scenarioCardHtml(key, s) {
 
     <div class="card-body">
       <div class="kpis" id="kpis-${key}">
-        <div class="kpi" id="kpi-cf-${key}"><div class="label">Monthly Cashflow</div><div class="value">—</div></div>
         <div class="kpi" id="kpi-yield-${key}"><div class="label">Net Yield (Yr1)</div><div class="value">—</div></div>
-        <div class="kpi" id="kpi-coc-${key}"><div class="label">Cash-on-Cash (Yr1)</div><div class="value">—</div></div>
         <div class="kpi" id="kpi-irr-${key}"><div class="label">IRR (${s.holdYrs} Yr)</div><div class="value">—</div></div>
       </div>
 
@@ -634,7 +523,12 @@ function wireInputs() {
 
       if (field === "emirate") {
         const newEm = state[key].emirate;
-        // Only update if current value is still the default for the OLD emirate
+        // Auto-update title if it looks generic
+        if(state[key].name.includes("Scenario") || state[key].name.includes("Option") || state[key].name.includes("Investment")) {
+            state[key].name = newEm + " Option";
+        }
+        
+        // Update Fees defaults only if they are the OLD defaults
         if (Math.abs(num(state[key].regFeePct) - defaultRegFeePct(prevEmirate)) < 0.001) {
             state[key].regFeePct = defaultRegFeePct(newEm);
         }
@@ -642,11 +536,15 @@ function wireInputs() {
             state[key].uaeMortgageRegPct = defaultMortgageRegPct(newEm);
         }
         
-        // Re-render the whole card to update the name and the fee inputs
-        render(); 
+        render(); // Re-render to update inputs with new defaults/name
         return; 
       }
       
+      // Instant Title Update
+      if (field === "name") {
+          document.querySelector(`.scenario-card[data-scenario="${key}"] .scenario-title h3`).textContent = `Scenario ${key}: ${el.value}`;
+      }
+
       showHideFinancingSections();
       saveState(state);
       recalcAndRender();
@@ -663,7 +561,6 @@ function wireInputs() {
 
 function setText(id, text, target="textContent") {
   const el = document.getElementById(id);
-  // Support selector for classes within an ID (e.g., kpi-cf-A .value)
   if (id.includes('.')) {
       const parentId = id.split(' ')[0];
       const selector = id.split(' ')[1];
@@ -679,24 +576,76 @@ function setText(id, text, target="textContent") {
 }
 
 function highlightBest(key, metric, value, results) {
-    let bestEl = null;
     let bestValue = -Infinity;
     
-    // Check all scenarios
+    // Find the best value
     SCENARIO_KEYS.forEach(k => {
         const kValue = results[k][metric];
         if (Number.isFinite(kValue) && kValue > bestValue) {
             bestValue = kValue;
-            bestEl = document.getElementById(`kpi-${metric}-${k}`);
         }
     });
 
-    // Reset all and set best
+    // Reset and set best
     SCENARIO_KEYS.forEach(k => {
         const el = document.getElementById(`kpi-${metric}-${k}`);
         if(el) el.classList.remove('best');
+        if (Number.isFinite(results[k][metric]) && Math.abs(results[k][metric] - bestValue) < 1e-12) {
+            el.classList.add('best');
+        }
     });
-    if(bestEl) bestEl.classList.add('best');
+}
+
+function updateCurrencyHints(results) {
+  // Update currency helpers next to AED inputs
+  document.querySelectorAll(".currency-helper").forEach(el => {
+    const parent = el.closest(".input-group");
+    if (!parent) return;
+
+    const input = parent.querySelector("input[type='number']");
+    if (!input) return;
+
+    const key = input.getAttribute("data-scenario");
+    const valAed = num(input.value);
+    const fx = results[key].fx;
+
+    if (fx > 0) {
+        const valEur = valAed / fx;
+        el.textContent = `≈ ${fmtMoney(valEur, "EUR")}`;
+    } else {
+        el.textContent = `Set FX`;
+    }
+  });
+}
+
+function renderFooter(results) {
+    // 1. Update FX Display
+    setText("fx-disp-eur", results.A.fx.toFixed(2));
+    setText("fx-disp-inr", FX_INR_PER_AED.toFixed(2));
+
+    // Helper for footer cells
+    const footerCell = (label, aed, eur) => {
+        const inr = aed * FX_INR_PER_AED;
+        return `
+            <div class="summ-item">
+                <span class="summ-lbl">${label}</span>
+                <div class="summ-val">${fmtCompact(aed)}<small>AED</small> | ${fmtCompact(eur)}<small>EUR</small></div>
+                <div class="summ-val">${fmtCompact(inr)}<small>INR</small></div>
+            </div>
+        `;
+    };
+
+    // 2. Update Scenario A & B Summaries
+    SCENARIO_KEYS.forEach(k => {
+        const r = results[k];
+        const html = 
+            footerCell("Price", r.priceAed, r.priceAed / r.fx) +
+            footerCell("Gross Rent/Yr", r.grossRentAed, r.grossRentAed / r.fx) +
+            footerCell("Cashflow/Month", r.monthlyCashflowAed, r.monthlyCashflowEur);
+        
+        setText(`summ-title-${k.toLowerCase()}`, r.label);
+        document.getElementById(`summ-metrics-${k.toLowerCase()}`).innerHTML = html;
+    });
 }
 
 
@@ -710,24 +659,20 @@ function recalcAndRender() {
     const r = results[k];
     
     // Update Scenario Card KPIs
-    setText(`kpi-cf-${k} .value`, `${fmtCompact(r.monthlyCashflowEur)}€ / ${fmtCompact(r.monthlyCashflowAed)}<small>AED</small>`, 'innerHTML');
     setText(`kpi-yield-${k} .value`, Number.isFinite(r.netYield) ? fmtPct(r.netYield * 100) : "n/a", 'textContent');
-    setText(`kpi-coc-${k} .value`, Number.isFinite(r.cashOnCash) ? fmtPct(r.cashOnCash * 100) : "n/a", 'textContent');
     
     // Update IRR label to reflect the actual hold period (which is dynamic)
     setText(`kpi-irr-${k} .label`, `IRR (${state[k].holdYrs} Yr)`, 'textContent');
     setText(`kpi-irr-${k} .value`, fmtIrr(r.irr), 'textContent');
     
     // Highlight Best KPIs on card
-    highlightBest(k, 'monthlyCashflowEur', r.monthlyCashflowEur, results);
     highlightBest(k, 'netYield', r.netYield, results);
-    highlightBest(k, 'cashOnCash', r.cashOnCash, results);
     highlightBest(k, 'irr', r.irr, results);
   });
 
   // Comparison Table
   const rows = [
-    { label: "Purchase Price", fmt: (s, r) => fmtMoney(s.purchasePriceAed,"AED") },
+    { label: "Purchase Price", fmt: (s, r) => `${fmtMoney(s.purchasePriceAed,"AED")}` },
     { label: "Total Acq. Cost", fmt: (s, r) => `${fmtMoney(r.totalAcqCostAed,"AED")} / ${fmtMoney(r.totalAcqCostEur,"EUR")}` },
     { label: "Cash Invested (EUR)", fmt: (s, r) => fmtMoney(r.cashInvestedEur,"EUR") },
     { label: "NOI (Year 1)", fmt: (s, r) => `${fmtMoney(r.noiAedYr1,"AED")} / ${fmtMoney(r.noiEurYr1,"EUR")}` },
@@ -761,20 +706,17 @@ function recalcAndRender() {
     return `<tr><td>${escapeHtml(row.label)}</td>${cells}</tr>`;
   }).join("");
   
-  // Render Charts
-  renderCharts(results);
+  // New features requested
+  updateCurrencyHints(results);
+  renderFooter(results);
 }
 
 function render() {
   if (!scenariosEl) return;
   
-  // Render HTML for the two scenarios
   scenariosEl.innerHTML = SCENARIO_KEYS.map(k => scenarioCardHtml(k, state[k])).join("");
   
-  // Re-wire listeners for newly created elements
   wireInputs();
-  
-  // Calculate and update all results (KPIs, Table, Charts)
   recalcAndRender();
 }
 
