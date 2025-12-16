@@ -1,98 +1,195 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>UAE Property Financing</title>
+  <meta name="description" content="Compare UAE buy-to-let scenarios (Cash / UAE mortgage / NL loan) with cashflow, yield, CoC, and IRR. Runs fully in-browser." />
 
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
+
 <body>
-
-<header class="main-header">
-  <div class="container header-row">
-    <div class="header-left">
-      <h1>UAE Property Financing</h1>
-      <p class="subtitle">Play with assumptions, compare scenarios, and see cashflow, yield, CoC and IRR.</p>
-    </div>
-    <div class="header-right">
-      <div class="today-pill">
-        <span class="today-label">Today</span>
-        <span id="gregorian-date" class="today-date"></span>
-      </div>
-    </div>
-  </div>
-</header>
-
-<main class="container">
-
-  <section>
-    <h2>Scenarios</h2>
-    <p class="muted">
-      Tip: Set Scenario A = UAE Mortgage, Scenario B = NL Loan, Scenario C = Cash (or anything you like).
-      All calculations run in your browser. Scenarios auto-save in this browser.
-    </p>
-
-    <div class="toolbar">
-      <button id="btn-reset" class="btn-secondary">Reset to defaults</button>
-      <button id="btn-copy-a-to-b" class="btn-secondary">Copy A → B</button>
-      <button id="btn-copy-a-to-c" class="btn-secondary">Copy A → C</button>
-      <button id="btn-export" class="btn-secondary">Export JSON</button>
-      <span class="autosave-badge" id="autosave-badge">Auto-saved</span>
-    </div>
-
-    <div id="scenarios" class="scenario-grid"></div>
-  </section>
-
-  <section>
-    <h2>Comparison</h2>
-    <div class="card">
-      <div class="card-body">
-        <div class="table-wrap">
-          <table class="compare-table" id="compare-table">
-            <thead>
-              <tr>
-                <th>Metric</th>
-                <th id="th-a">Scenario A</th>
-                <th id="th-b">Scenario B</th>
-                <th id="th-c">Scenario C</th>
-              </tr>
-            </thead>
-            <tbody id="compare-body"></tbody>
-          </table>
+  <header class="topbar">
+    <div class="wrap topbar__row">
+      <div>
+        <div class="brand">
+          <span class="brand__dot"></span>
+          <h1>UAE Property Financing</h1>
         </div>
-        <p class="muted tiny">
-          Notes: IRR uses constant FX rate (no FX forward curve). Taxes are not included.
-          Always verify fees with your agent/bank for the exact project and emirate.
-        </p>
+        <p class="sub">Compare 2 scenarios (A/B). Auto-saves in your browser.</p>
+      </div>
+
+      <div class="topbar__right">
+        <div class="pill" aria-label="Today">
+          <span class="pill__label">Today</span>
+          <span id="gregorian-date" class="pill__value">—</span>
+        </div>
       </div>
     </div>
-  </section>
+  </header>
 
-  <section class="quotes-section">
-    <h2>Quick Motivation</h2>
-    <div class="card quote-card">
-      <div class="quote-content">
-        <p class="tamil-quote" id="tamil-quote"></p>
-        <p class="english-meaning" id="english-meaning"></p>
+  <main class="wrap">
+
+    <!-- GLOBAL FX -->
+    <section class="section">
+      <div class="section__title">
+        <h2>Currency</h2>
+        <p class="muted">AED inputs show an instant EUR + INR hint under each field.</p>
       </div>
-      <button id="new-quote-btn" class="btn-primary">Show another quote</button>
+
+      <div class="card">
+        <div class="card__body grid2">
+          <div>
+            <label for="global-inr-per-eur">FX: 1 EUR = (INR)</label>
+            <input id="global-inr-per-eur" type="number" step="0.01" min="0" inputmode="decimal" />
+            <div class="hint" id="global-inr-hint">Used for INR conversions (hints + bottom bar).</div>
+          </div>
+
+          <div class="callout">
+            <div class="callout__title">Exchange rates used</div>
+            <div class="callout__row">
+              <div class="callout__k">INR per EUR</div>
+              <div class="callout__v" id="fx-inr-eur-display">—</div>
+            </div>
+            <div class="callout__row">
+              <div class="callout__k">AED per EUR</div>
+              <div class="callout__v muted">Set per scenario under <b>Financing</b>.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACTIONS -->
+    <section class="section">
+      <div class="section__title">
+        <h2>Scenarios</h2>
+        <p class="muted">Tip: set A = UAE Mortgage, B = NL Loan (or Cash).</p>
+      </div>
+
+      <div class="toolbar" role="toolbar" aria-label="Scenario tools">
+        <button id="btn-reset" class="btn btn--ghost" type="button" title="Reset scenarios to defaults">
+          <span class="ico" aria-hidden="true">↺</span> Reset
+        </button>
+        <button id="btn-copy-a-to-b" class="btn btn--ghost" type="button" title="Copy scenario A to B">
+          <span class="ico" aria-hidden="true">⎘</span> Copy A → B
+        </button>
+        <button id="btn-swap" class="btn btn--ghost" type="button" title="Swap A and B">
+          <span class="ico" aria-hidden="true">⇄</span> Swap A ↔ B
+        </button>
+        <button id="btn-export" class="btn btn--ghost" type="button" title="Export your scenarios as JSON">
+          <span class="ico" aria-hidden="true">⬇</span> Export
+        </button>
+
+        <span id="autosave-badge" class="badge badge--save" aria-live="polite">Auto-saved</span>
+      </div>
+
+      <div id="scenarios" class="scenarios" aria-label="Scenario comparison grid"></div>
+    </section>
+
+    <!-- COMPARISON -->
+    <section class="section">
+      <div class="section__title">
+        <h2>Comparison</h2>
+        <p class="muted">Best value per row is highlighted.</p>
+      </div>
+
+      <div class="card">
+        <div class="card__body">
+          <div class="tablewrap" role="region" aria-label="Scenario comparison table" tabindex="0">
+            <table class="table" id="compare-table">
+              <thead>
+                <tr>
+                  <th scope="col">Metric</th>
+                  <th scope="col" id="th-a">Scenario A</th>
+                  <th scope="col" id="th-b">Scenario B</th>
+                </tr>
+              </thead>
+              <tbody id="compare-body"></tbody>
+            </table>
+          </div>
+
+          <p class="fineprint">
+            IRR uses a constant FX rate you set. Taxes are not included. Always verify fees/service charges with the developer/agent.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUOTE -->
+    <section class="section">
+      <div class="section__title">
+        <h2>Quick Motivation</h2>
+        <p class="muted">A small push while you run numbers 🙂</p>
+      </div>
+
+      <div class="card quote">
+        <div class="quote__body">
+          <p id="tamil-quote" class="quote__ta"></p>
+          <p id="english-meaning" class="quote__en"></p>
+          <button id="new-quote-btn" class="btn btn--primary" type="button">New quote</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Sticky bottom bar -->
+  <div class="bottom" role="contentinfo" aria-label="Bottom summary">
+    <div class="wrap bottom__row">
+      <div class="bottom__block" id="bottom-a">
+        <div class="bottom__title" id="bottom-title-a">A</div>
+        <div class="bottom__grid">
+          <div class="bottom__item">
+            <div class="bottom__k">Price</div>
+            <div class="bottom__v" id="bottom-price-a">—</div>
+          </div>
+          <div class="bottom__item">
+            <div class="bottom__k">Gross rent / yr</div>
+            <div class="bottom__v" id="bottom-rent-a">—</div>
+          </div>
+          <div class="bottom__item">
+            <div class="bottom__k">Monthly cashflow</div>
+            <div class="bottom__v" id="bottom-cf-a">—</div>
+          </div>
+        </div>
+        <div class="bottom__fx" id="bottom-fx-a">FX —</div>
+      </div>
+
+      <div class="bottom__divider" aria-hidden="true"></div>
+
+      <div class="bottom__block" id="bottom-b">
+        <div class="bottom__title" id="bottom-title-b">B</div>
+        <div class="bottom__grid">
+          <div class="bottom__item">
+            <div class="bottom__k">Price</div>
+            <div class="bottom__v" id="bottom-price-b">—</div>
+          </div>
+          <div class="bottom__item">
+            <div class="bottom__k">Gross rent / yr</div>
+            <div class="bottom__v" id="bottom-rent-b">—</div>
+          </div>
+          <div class="bottom__item">
+            <div class="bottom__k">Monthly cashflow</div>
+            <div class="bottom__v" id="bottom-cf-b">—</div>
+          </div>
+        </div>
+        <div class="bottom__fx" id="bottom-fx-b">FX —</div>
+      </div>
     </div>
-  </section>
-
-</main>
-
-<footer class="main-footer">
-  <div class="container">
-    <p>Veera’s tools • UAE Property Financing (GitHub Pages friendly)</p>
   </div>
-</footer>
 
-<script src="script.js"></script>
+  <footer class="footer">
+    <div class="wrap">
+      <span class="muted">UAE Property Financing • static GitHub Pages friendly</span>
+    </div>
+  </footer>
+
+  <script src="./script.js"></script>
 </body>
 </html>
