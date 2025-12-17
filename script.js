@@ -6,49 +6,17 @@
  * - AED inputs show EUR+INR hints
  *********************************/
 
-/* -------- date (top-right) -------- */
-(function setToday(){
-  const el = document.getElementById("gregorian-date");
-  if(!el) return;
-  const d = new Date();
-  el.textContent = d.toLocaleDateString("en-GB", { weekday:"short", day:"2-digit", month:"short", year:"numeric" });
+/* -------- date + footer year -------- */
+(function initDate(){
+  const dateEl = document.getElementById("gregorian-date");
+  if(dateEl){
+    const d = new Date();
+    dateEl.textContent = d.toLocaleDateString("en-GB", { weekday:"short", day:"2-digit", month:"short", year:"numeric" });
+  }
+
+  const yearEl = document.getElementById("year-now");
+  if(yearEl) yearEl.textContent = new Date().getFullYear();
 })();
-
-/* -------- quotes -------- */
-const quotes = [
-  { tamil:"முயற்சி திருவினையாக்கும்.", english:"Effort will bring success." },
-  { tamil:"கற்றது கைமண் அளவு, கல்லாதது உலகளவு.", english:"What we have learned is small; what we haven't is vast." },
-  { tamil:"யாதும் ஊரே யாவரும் கேளிர்.", english:"All towns are ours; all people are our kin." },
-  { tamil:"தீதும் நன்றும் பிறர் தர வாரா.", english:"Good and bad do not come from others." },
-  { tamil:"ஒன்று பட்டால் உண்டு வாழ்வு.", english:"Unity is strength." },
-  { tamil:"அறம் செய்ய விரும்பு.", english:"Desire to do good deeds." }
-];
-
-const tamilQuoteEl = document.getElementById("tamil-quote");
-const englishMeaningEl = document.getElementById("english-meaning");
-const newQuoteBtn = document.getElementById("new-quote-btn");
-let currentQuoteIndex = -1;
-
-function showRandomQuote(){
-  if(!tamilQuoteEl || !englishMeaningEl) return;
-  let idx;
-  do { idx = Math.floor(Math.random() * quotes.length); }
-  while (idx === currentQuoteIndex && quotes.length > 1);
-
-  currentQuoteIndex = idx;
-  tamilQuoteEl.style.opacity = 0;
-  englishMeaningEl.style.opacity = 0;
-
-  setTimeout(() => {
-    tamilQuoteEl.textContent = `"${quotes[idx].tamil}"`;
-    englishMeaningEl.textContent = quotes[idx].english;
-    tamilQuoteEl.style.opacity = 1;
-    englishMeaningEl.style.opacity = 1;
-  }, 160);
-}
-
-if(newQuoteBtn) newQuoteBtn.addEventListener("click", showRandomQuote);
-showRandomQuote();
 
 /* -------- helpers -------- */
 const STORAGE_KEY = "uaePropertyFinancing.v3";
@@ -58,6 +26,10 @@ const num = (v) => {
   return Number.isFinite(x) ? x : 0;
 };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const FX_ENDPOINT = "https://api.exchangerate.host/latest?base=AED&symbols=USD,EUR,GBP,INR";
+const FX_FALLBACK = { USD:0.2723, EUR:0.2487, GBP:0.2110, INR:22.70 };
+let fxLastFetched = null;
+let fxChart = null;
 
 function fmtMoney(v, cur){
   const x = num(v);
@@ -144,7 +116,12 @@ function irr(cashflows){
 
 /* -------- defaults / state -------- */
 const DEFAULTS = {
-  global: { inrPerEur: 90.0 },
+  global: {
+    inrPerEur: 90.0,
+    fxRates: FX_FALLBACK,
+    fxSource: "Fallback",
+    fxUpdated: null
+  },
   A: {
     name: "Scenario A",
     emirate: "Dubai",
@@ -259,6 +236,9 @@ function loadState(){
     if(!raw) return clone(DEFAULTS);
     const s = JSON.parse(raw);
     if(!s || !s.A || !s.B || !s.global) return clone(DEFAULTS);
+    if(!s.global.fxRates) s.global.fxRates = FX_FALLBACK;
+    if(!s.global.fxSource) s.global.fxSource = "Fallback";
+    if(!("inrPerEur" in s.global)) s.global.inrPerEur = DEFAULTS.global.inrPerEur;
     return s;
   }catch{
     return clone(DEFAULTS);
@@ -660,7 +640,74 @@ function updateAllHints(){
     AED_FIELDS.forEach(f => updateFieldHint(k, f, "AED"));
     EUR_FIELDS.forEach(f => updateFieldHint(k, f, "EUR"));
   });
+  const eurPerAed = num(state.global.fxRates?.EUR || FX_FALLBACK.EUR);
+  const aedPerEur = eurPerAed > 0 ? (1 / eurPerAed) : state.A.fxAedPerEur;
   setText("fx-inr-eur-display", `1 EUR = ${num(state.global.inrPerEur).toLocaleString("en-GB",{maximumFractionDigits:2})} INR`);
+  setText("fx-aed-eur-display", `1 EUR = ${aedPerEur.toLocaleString("en-GB",{maximumFractionDigits:4})} AED`);
+  setText("fx-source-display", state.global.fxSource || "Live or fallback");
+}
+
+/* FX utilities */
+function updateFxUi(){
+  const fx = state.global.fxRates || FX_FALLBACK;
+  setText("fx-usd", `${num(fx.USD).toFixed(4)} USD`);
+  setText("fx-eur", `${num(fx.EUR).toFixed(4)} EUR`);
+  setText("fx-gbp", `${num(fx.GBP).toFixed(4)} GBP`);
+  setText("fx-inr", `${num(fx.INR).toFixed(2)} INR`);
+
+  const aedPerEur = fx.EUR > 0 ? (1 / fx.EUR) : 0;
+  setText("fx-eur-inverse", aedPerEur ? `1 EUR ≈ ${aedPerEur.toFixed(3)} AED` : "1 EUR ≈ — AED");
+  setText("fx-updated", fxLastFetched ? `Last updated: ${fxLastFetched.toLocaleString()}` : "Using cached/fallback rates");
+  setText("fx-source", state.global.fxSource ? `Exchange rates powered by exchangerate.host • ${state.global.fxSource}` : "Exchange rates powered by exchangerate.host");
+  updateAllHints();
+}
+
+async function fetchLiveFx(){
+  const sourceEl = document.getElementById("fx-source");
+  try{
+    if(sourceEl) sourceEl.textContent = "Loading live rates...";
+    const resp = await fetch(FX_ENDPOINT);
+    if(!resp.ok) throw new Error("Bad response");
+    const data = await resp.json();
+    if(!data || !data.rates) throw new Error("No rates");
+    const rates = data.rates;
+    state.global.fxRates = {
+      USD: num(rates.USD) || FX_FALLBACK.USD,
+      EUR: num(rates.EUR) || FX_FALLBACK.EUR,
+      GBP: num(rates.GBP) || FX_FALLBACK.GBP,
+      INR: num(rates.INR) || FX_FALLBACK.INR
+    };
+    state.global.fxSource = "Live (exchangerate.host)";
+    fxLastFetched = new Date();
+
+    const eurPerAed = state.global.fxRates.EUR || FX_FALLBACK.EUR;
+    const aedPerEur = eurPerAed > 0 ? (1 / eurPerAed) : state.A.fxAedPerEur;
+    const inrPerEur = aedPerEur * state.global.fxRates.INR;
+    state.global.inrPerEur = num(inrPerEur);
+
+    saveState();
+    updateFxUi();
+    render();
+  }catch(err){
+    state.global.fxRates = FX_FALLBACK;
+    state.global.fxSource = "Fallback";
+    if(sourceEl) sourceEl.textContent = "Using fallback rates (couldn't reach live source)";
+    updateFxUi();
+  }
+}
+
+function applyEurRateToScenarios(){
+  const eurPerAed = num(state.global.fxRates?.EUR || FX_FALLBACK.EUR);
+  if(eurPerAed <= 0) return;
+  const aedPerEur = 1 / eurPerAed;
+  scenarioKeys.forEach(k => {
+    state[k].fxAedPerEur = aedPerEur;
+    const el = document.getElementById(`${k}-fxAedPerEur`);
+    if(el) el.value = aedPerEur.toFixed(4);
+  });
+  saveState();
+  updateAllHints();
+  recalcAndRender();
 }
 
 /* Basic input validation (non-negative for most numeric inputs) */
@@ -850,6 +897,41 @@ function recalcAndRender(){
 
   setText("bottom-fx-a", `FX used: 1 EUR = ${res.A.fxAedPerEur} AED • 1 EUR = ${res.A.inrPerEur} INR`);
   setText("bottom-fx-b", `FX used: 1 EUR = ${res.B.fxAedPerEur} AED • 1 EUR = ${res.B.inrPerEur} INR`);
+
+  renderChart(res);
+}
+
+function renderChart(res){
+  const ctx = document.getElementById("returns-chart");
+  if(!ctx || typeof Chart === "undefined") return;
+  const labels = ["Scenario A","Scenario B"];
+  const irrData = labels.map((_, idx) => {
+    const key = idx === 0 ? "A" : "B";
+    const v = res[key].irr;
+    return Number.isFinite(v) ? v * 100 : null;
+  });
+  const cocData = labels.map((_, idx) => {
+    const key = idx === 0 ? "A" : "B";
+    const v = res[key].cashOnCash;
+    return Number.isFinite(v) ? v * 100 : null;
+  });
+
+  if(fxChart) fxChart.destroy();
+  fxChart = new Chart(ctx, {
+    type:"bar",
+    data:{
+      labels,
+      datasets:[
+        { label:"IRR (%, hold period)", data:irrData, backgroundColor:"rgba(14,165,233,0.7)" },
+        { label:"Cash-on-cash (Year 1, %)", data:cocData, backgroundColor:"rgba(22,163,74,0.7)" }
+      ]
+    },
+    options:{
+      responsive:true,
+      scales:{ y:{ beginAtZero:true, ticks:{ callback:(v) => `${v}%` } } },
+      plugins:{ legend:{ position:"bottom" } }
+    }
+  });
 }
 
 /* Toolbar */
@@ -895,6 +977,33 @@ function wireToolbar(){
   });
 }
 
+function wireFxButtons(){
+  const refresh = document.getElementById("btn-refresh-fx");
+  const apply = document.getElementById("btn-apply-eur");
+  if(refresh) refresh.addEventListener("click", fetchLiveFx);
+  if(apply) apply.addEventListener("click", applyEurRateToScenarios);
+}
+
+function wireBottomToggle(){
+  const btn = document.getElementById("toggle-bottom");
+  const summary = document.getElementById("bottom-summary");
+  if(!btn || !summary) return;
+  const syncLabel = () => {
+    const collapsed = summary.classList.contains("collapsed");
+    btn.setAttribute("aria-expanded", (!collapsed).toString());
+    btn.innerHTML = `${collapsed ? '<i class="fa-solid fa-arrow-up-wide-short me-2"></i>' : '<i class="fa-solid fa-arrow-down-wide-short me-2"></i>'}${collapsed ? 'Summary' : 'Hide summary'}`;
+  };
+  btn.addEventListener("click", () => {
+    summary.classList.toggle("collapsed");
+    syncLabel();
+  });
+
+  if(window.innerWidth > 900){
+    summary.classList.remove("collapsed");
+  }
+  syncLabel();
+}
+
 /* Render */
 function render(){
   // Global inputs
@@ -912,4 +1021,8 @@ function render(){
 }
 
 wireToolbar();
+wireFxButtons();
+wireBottomToggle();
+updateFxUi();
 render();
+fetchLiveFx();
