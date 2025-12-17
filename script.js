@@ -1,35 +1,62 @@
 /*********************************
- * UAE Property Financing (v3)
+ * UAE Property Financing (v4)
  * - 2 scenarios (A/B)
- * - LocalStorage persistence
- * - Cashflow, Net Yield, CoC, IRR
- * - AED inputs show EUR+INR hints
+ * - Enhanced for Off-Plan, Residency, & Dev Plans
+ * - Auto-calc Service Charges & Down Payment defaults
  *********************************/
 
-/* -------- date + footer year -------- */
-(function initDate(){
-  const dateEl = document.getElementById("gregorian-date");
-  if(dateEl){
-    const d = new Date();
-    dateEl.textContent = d.toLocaleDateString("en-GB", { weekday:"short", day:"2-digit", month:"short", year:"numeric" });
-  }
-
-  const yearEl = document.getElementById("year-now");
-  if(yearEl) yearEl.textContent = new Date().getFullYear();
+/* -------- date (top-right) -------- */
+(function setToday(){
+  const el = document.getElementById("gregorian-date");
+  if(!el) return;
+  const d = new Date();
+  el.textContent = d.toLocaleDateString("en-GB", { weekday:"short", day:"2-digit", month:"short", year:"numeric" });
 })();
 
+/* -------- quotes -------- */
+const quotes = [
+  { tamil:"முயற்சி திருவினையாக்கும்.", english:"Effort will bring success." },
+  { tamil:"கற்றது கைமண் அளவு, கல்லாதது உலகளவு.", english:"What we have learned is small; what we haven't is vast." },
+  { tamil:"யாதும் ஊரே யாவரும் கேளிர்.", english:"All towns are ours; all people are our kin." },
+  { tamil:"தீதும் நன்றும் பிறர் தர வாரா.", english:"Good and bad do not come from others." },
+  { tamil:"ஒன்று பட்டால் உண்டு வாழ்வு.", english:"Unity is strength." },
+  { tamil:"அறம் செய்ய விரும்பு.", english:"Desire to do good deeds." }
+];
+
+const tamilQuoteEl = document.getElementById("tamil-quote");
+const englishMeaningEl = document.getElementById("english-meaning");
+const newQuoteBtn = document.getElementById("new-quote-btn");
+let currentQuoteIndex = -1;
+
+function showRandomQuote(){
+  if(!tamilQuoteEl || !englishMeaningEl) return;
+  let idx;
+  do { idx = Math.floor(Math.random() * quotes.length); }
+  while (idx === currentQuoteIndex && quotes.length > 1);
+
+  currentQuoteIndex = idx;
+  tamilQuoteEl.style.opacity = 0;
+  englishMeaningEl.style.opacity = 0;
+
+  setTimeout(() => {
+    tamilQuoteEl.textContent = `"${quotes[idx].tamil}"`;
+    englishMeaningEl.textContent = quotes[idx].english;
+    tamilQuoteEl.style.opacity = 1;
+    englishMeaningEl.style.opacity = 1;
+  }, 160);
+}
+
+if(newQuoteBtn) newQuoteBtn.addEventListener("click", showRandomQuote);
+showRandomQuote();
+
 /* -------- helpers -------- */
-const STORAGE_KEY = "uaePropertyFinancing.v3";
+const STORAGE_KEY = "uaePropertyFinancing.v4";
 
 const num = (v) => {
   const x = Number(v);
   return Number.isFinite(x) ? x : 0;
 };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const FX_ENDPOINT = "https://api.fastforex.io/fetch-multi?from=EUR&to=AED,USD,GBP,INR&api_key=demo";
-const FX_FALLBACK = { USD:1.1713, AED:4.3017, GBP:0.8480, INR:105.85 };
-let fxLastFetched = null;
-let fxChart = null;
 
 function fmtMoney(v, cur){
   const x = num(v);
@@ -47,7 +74,7 @@ function fmtIrr(v){
 }
 function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
-/* Default fees by emirate */
+/* Default Logic */
 function defaultRegFeePct(emirate){ return emirate === "Abu Dhabi" ? 2.0 : 4.0; }
 function defaultMortgageRegPct(emirate){ return emirate === "Abu Dhabi" ? 0.10 : 0.25; }
 
@@ -98,64 +125,110 @@ function irr(cashflows){
     if(nx <= -0.95 || nx > 5) break;
     x = nx;
   }
-
-  // Bisection
-  let lo = -0.9, hi = 2.5;
-  let flo = npv(lo), fhi = npv(hi);
-  if(flo * fhi > 0) return NaN;
-
-  for(let i=0;i<120;i++){
-    const mid = (lo + hi) / 2;
-    const fmid = npv(mid);
-    if(Math.abs(fmid) < 1e-7) return mid;
-    if(flo * fmid < 0){ hi = mid; fhi = fmid; }
-    else { lo = mid; flo = fmid; }
-  }
-  return (lo + hi) / 2;
+  return x;
 }
 
 /* -------- defaults / state -------- */
 const DEFAULTS = {
-  global: {
-    inrPerEur: FX_FALLBACK.INR,
-    fxRates: FX_FALLBACK,
-    fxSource: "Fallback",
-    fxUpdated: null
-  },
+  global: { inrPerEur: 90.0 },
   A: {
     name: "Scenario A",
     emirate: "Dubai",
     unitType: "1BHK",
+    residency: "Resident", // Resident | Non-Resident
+    rentalStrategy: "Long-term", // Long-term | Short-term
     offPlan: false,
 
-    fxAedPerEur: 4.00,          // 1 EUR = X AED
-    purchasePriceAed: 800000,
+    fxAedPerEur: 4.00,
+    unitSizeSqFt: 800,
+    purchasePriceAed: 1200000,
 
-    annualRentAed: 72000,
+    annualRentAed: 95000,
     vacancyPct: 5,
     rentGrowthPct: 3,
     expenseGrowthPct: 2,
 
     // Upfront
     regFeePct: 4.0,
-    regAdminAed: 580,
-    agentPct: 2.0,
+    regAdminAed: 580,    // Standard Title Deed
+    agentPct: 2.0,       // 0% for off-plan
     vatPct: 5.0,
-    trusteeFeeAed: 4000,
-    nocFeeAed: 1500,
+    trusteeFeeAed: 4200, // ~1k USD + misc
+    nocFeeAed: 2000,     // ~500 USD
     otherUpfrontAed: 0,
     furnitureAed: 0,
 
     // Operating
-    serviceChargesAedYr: 12000,
-    mgmtPct: 8,
+    serviceChargeRate: 15, // AED per sq ft
+    serviceChargesAedYr: 12000, // Auto-calculated usually
+    mgmtPct: 5,            // 20% for Short-term
     maintPct: 5,
-    insuranceAedYr: 800,
+    insuranceAedYr: 1000,
     otherOpAedYr: 0,
 
     // Financing
-    financingMode: "UAE Mortgage", // Cash | UAE Mortgage | NL Loan
-    uaeDownPct: 25,
+    financingMode: "UAE Mortgage", // Cash | UAE Mortgage | NL Loan | Dev Plan
+    uaeDownPct: 20,              // 20% Resident, 40% Non-Res
+    uaeRatePct: 5.0,
+    uaeTermYrs: 25,
+    uaeBankFeePct: 1.0,
+    uaeBankFeeAed: 0,
+    uaeMortgageRegPct: 0.25,
+    uaeMortgageRegAdminAed: 290,
+
+    // Dev Plan
+    devPlanPremiumPct: 0, // Price markup
+    devPlanTermYrs: 5,    // Construction/Post-handover period
+
+    nlLoanAmountEur: 0,
+    nlRatePct: 5.0,
+    nlTermYrs: 20,
+    nlRepayment: "Amortizing",
+    nlBankFeePct: 0.0,
+    nlBankFeeEur: 0.0,
+
+    // Exit
+    holdYrs: 7,
+    appreciationPct: 4.0,
+    sellAgentPct: 2.0,
+    sellVatPct: 5.0,
+    sellOtherAed: 2000
+  },
+  B: {
+    name: "Scenario B",
+    emirate: "Dubai",
+    unitType: "1BHK",
+    residency: "Non-Resident",
+    rentalStrategy: "Short-term",
+    offPlan: true,
+
+    fxAedPerEur: 4.00,
+    unitSizeSqFt: 800,
+    purchasePriceAed: 1300000, // Slightly higher due to off-plan/payment plan
+
+    annualRentAed: 130000, // Higher gross for Airbnb
+    vacancyPct: 15,        // Higher vacancy for Airbnb
+    rentGrowthPct: 3,
+    expenseGrowthPct: 2,
+
+    regFeePct: 4.0,
+    regAdminAed: 55000, // Developer Admin Fee (~$15k USD)
+    agentPct: 0.0,      // No agent fee off-plan
+    vatPct: 5.0,
+    trusteeFeeAed: 0,   // Oqood usually included or small
+    nocFeeAed: 0,
+    otherUpfrontAed: 0,
+    furnitureAed: 25000, // Furnishing for Airbnb
+
+    serviceChargeRate: 16,
+    serviceChargesAedYr: 12800,
+    mgmtPct: 20,        // Short-term mgmt
+    maintPct: 5,
+    insuranceAedYr: 1000,
+    otherOpAedYr: 2000, // Utilities (DEWA/Internet) for Airbnb
+
+    financingMode: "Dev Plan",
+    uaeDownPct: 20, // 20% typical off-plan down
     uaeRatePct: 5.5,
     uaeTermYrs: 25,
     uaeBankFeePct: 1.0,
@@ -163,59 +236,10 @@ const DEFAULTS = {
     uaeMortgageRegPct: 0.25,
     uaeMortgageRegAdminAed: 290,
 
+    devPlanPremiumPct: 5, // 5% markup for plan
+    devPlanTermYrs: 5,
+
     nlLoanAmountEur: 0,
-    nlRatePct: 5.0,
-    nlTermYrs: 20,
-    nlRepayment: "Amortizing",    // Amortizing | Interest-only
-    nlBankFeePct: 0.0,
-    nlBankFeeEur: 0.0,
-
-    // Exit
-    holdYrs: 7,
-    appreciationPct: 3.0,
-    sellAgentPct: 2.0,
-    sellVatPct: 5.0,
-    sellOtherAed: 0
-  },
-  B: {
-    name: "Scenario B",
-    emirate: "Abu Dhabi",
-    unitType: "1BHK",
-    offPlan: false,
-
-    fxAedPerEur: 4.00,
-    purchasePriceAed: 750000,
-
-    annualRentAed: 65000,
-    vacancyPct: 5,
-    rentGrowthPct: 3,
-    expenseGrowthPct: 2,
-
-    regFeePct: 2.0,
-    regAdminAed: 580,
-    agentPct: 2.0,
-    vatPct: 5.0,
-    trusteeFeeAed: 4000,
-    nocFeeAed: 1500,
-    otherUpfrontAed: 0,
-    furnitureAed: 0,
-
-    serviceChargesAedYr: 12000,
-    mgmtPct: 8,
-    maintPct: 5,
-    insuranceAedYr: 800,
-    otherOpAedYr: 0,
-
-    financingMode: "NL Loan",
-    uaeDownPct: 25,
-    uaeRatePct: 5.5,
-    uaeTermYrs: 25,
-    uaeBankFeePct: 1.0,
-    uaeBankFeeAed: 0,
-    uaeMortgageRegPct: 0.10,
-    uaeMortgageRegAdminAed: 290,
-
-    nlLoanAmountEur: 120000,
     nlRatePct: 5.0,
     nlTermYrs: 20,
     nlRepayment: "Interest-only",
@@ -223,10 +247,10 @@ const DEFAULTS = {
     nlBankFeeEur: 0.0,
 
     holdYrs: 7,
-    appreciationPct: 3.0,
+    appreciationPct: 5.0, // New build appreciation
     sellAgentPct: 2.0,
     sellVatPct: 5.0,
-    sellOtherAed: 0
+    sellOtherAed: 3500  // NOC etc
   }
 };
 
@@ -236,9 +260,14 @@ function loadState(){
     if(!raw) return clone(DEFAULTS);
     const s = JSON.parse(raw);
     if(!s || !s.A || !s.B || !s.global) return clone(DEFAULTS);
-    if(!s.global.fxRates) s.global.fxRates = FX_FALLBACK;
-    if(!s.global.fxSource) s.global.fxSource = "Fallback";
-    if(!("inrPerEur" in s.global)) s.global.inrPerEur = DEFAULTS.global.inrPerEur;
+    // Migration for new keys if old state loaded
+    ["A","B"].forEach(k => {
+      if(s[k].residency === undefined) s[k].residency = "Resident";
+      if(s[k].rentalStrategy === undefined) s[k].rentalStrategy = "Long-term";
+      if(s[k].unitSizeSqFt === undefined) s[k].unitSizeSqFt = 800;
+      if(s[k].serviceChargeRate === undefined) s[k].serviceChargeRate = 15;
+      if(s[k].devPlanTermYrs === undefined) s[k].devPlanTermYrs = 5;
+    });
     return s;
   }catch{
     return clone(DEFAULTS);
@@ -268,17 +297,29 @@ function calcScenario(s, global){
   const eurToInr = (eur) => num(eur) * inrPerEur;
   const aedToInr = (aed) => eurToInr(aedToEur(aed));
 
-  const priceAed = num(s.purchasePriceAed);
+  // Base Price Logic
+  let priceAed = num(s.purchasePriceAed);
+  // If Dev Plan, apply premium to price (hidden cost)
+  if(s.financingMode === "Dev Plan"){
+     priceAed = priceAed * (1 + num(s.devPlanPremiumPct)/100);
+  }
+
+  // Auto-calc service charges if rate is provided
+  let svcCharges = num(s.serviceChargesAedYr);
+  if(num(s.unitSizeSqFt) > 0 && num(s.serviceChargeRate) > 0){
+    svcCharges = num(s.unitSizeSqFt) * num(s.serviceChargeRate);
+  }
 
   // Upfront
   const regFeeAed = priceAed * num(s.regFeePct) / 100;
-  const agentFeeAed = priceAed * num(s.agentPct) / 100;
+  const agentFeeAed = priceAed * num(s.agentPct) / 100; // Should be 0 if off-plan
   const agentVatAed = agentFeeAed * num(s.vatPct) / 100;
 
   let mortgageRegAed = 0, bankFeesAed = 0, bankFeesEur = 0;
   let annualDebtServiceAed = 0, annualDebtServiceEur = 0;
   let remainingLoanAtExitAed = 0, remainingLoanAtExitEur = 0;
 
+  // Financing Logic
   if(s.financingMode === "UAE Mortgage"){
     const downPct = clamp(num(s.uaeDownPct), 0, 100);
     const loanAed = Math.max(0, priceAed * (1 - downPct / 100));
@@ -291,6 +332,23 @@ function calcScenario(s, global){
 
     const monthsHeld = Math.round(num(s.holdYrs) * 12);
     remainingLoanAtExitAed = remainingBalance(loanAed, num(s.uaeRatePct), num(s.uaeTermYrs), monthsHeld);
+
+  } else if(s.financingMode === "Dev Plan"){
+    // Interest-free payment plan
+    const downPct = clamp(num(s.uaeDownPct), 0, 100);
+    const financedAed = Math.max(0, priceAed * (1 - downPct / 100));
+    // Simple linear model for cashflow estimation: Remaining / Years
+    const term = Math.max(1, num(s.devPlanTermYrs));
+    annualDebtServiceAed = financedAed / term;
+    
+    // Remaining balance at exit
+    const yearsHeld = num(s.holdYrs);
+    if(yearsHeld >= term) {
+      remainingLoanAtExitAed = 0;
+    } else {
+      remainingLoanAtExitAed = financedAed - (annualDebtServiceAed * yearsHeld);
+    }
+
   } else if(s.financingMode === "NL Loan"){
     const loanEur = Math.max(0, num(s.nlLoanAmountEur));
     bankFeesEur = loanEur * num(s.nlBankFeePct) / 100 + num(s.nlBankFeeEur);
@@ -321,7 +379,7 @@ function calcScenario(s, global){
   const rentGrowth = num(s.rentGrowthPct) / 100;
   const expGrowth  = num(s.expenseGrowthPct) / 100;
 
-  const service1   = num(s.serviceChargesAedYr);
+  const service1   = svcCharges; // using the calculated or overridden value
   const insurance1 = num(s.insuranceAedYr);
   const otherOp1   = num(s.otherOpAedYr);
 
@@ -334,7 +392,7 @@ function calcScenario(s, global){
 
   let cashInvestedEur = aedToEur(totalAcqCostAed) + bankFeesEur;
 
-  if(s.financingMode === "UAE Mortgage"){
+  if(s.financingMode === "UAE Mortgage" || s.financingMode === "Dev Plan"){
     const downPaymentAed = priceAed * (clamp(num(s.uaeDownPct), 0, 100) / 100);
     cashInvestedEur = aedToEur(downPaymentAed + upfrontAed);
   } else if(s.financingMode === "NL Loan"){
@@ -363,6 +421,10 @@ function calcScenario(s, global){
 
     let debtY_Eur = 0;
     if(s.financingMode === "UAE Mortgage") debtY_Eur = aedToEur(annualDebtServiceAed);
+    else if(s.financingMode === "Dev Plan") {
+      // Dev plan payments stop after term
+      if(y <= num(s.devPlanTermYrs)) debtY_Eur = aedToEur(annualDebtServiceAed);
+    }
     else if(s.financingMode === "NL Loan") debtY_Eur = annualDebtServiceEur;
 
     const cashflowY_Eur = aedToEur(noiY) - debtY_Eur;
@@ -380,7 +442,7 @@ function calcScenario(s, global){
   const saleNetAedBeforeDebt = salePriceAed - sellAgentAed - sellVatAed - sellOtherAed;
 
   let debtPayoffEur = 0;
-  if(s.financingMode === "UAE Mortgage") debtPayoffEur = aedToEur(remainingLoanAtExitAed);
+  if(s.financingMode === "UAE Mortgage" || s.financingMode === "Dev Plan") debtPayoffEur = aedToEur(remainingLoanAtExitAed);
   else if(s.financingMode === "NL Loan") debtPayoffEur = remainingLoanAtExitEur;
 
   const saleProceedsEur = aedToEur(saleNetAedBeforeDebt) - debtPayoffEur;
@@ -391,7 +453,7 @@ function calcScenario(s, global){
   const netYield = totalAcqCostEur > 0 ? (noiEurYr1 / totalAcqCostEur) : NaN;
 
   const annualDebtServiceEurShown =
-    (s.financingMode === "UAE Mortgage") ? aedToEur(annualDebtServiceAed) :
+    (s.financingMode === "UAE Mortgage" || s.financingMode === "Dev Plan") ? aedToEur(annualDebtServiceAed) :
     (s.financingMode === "NL Loan") ? annualDebtServiceEur : 0;
 
   const monthlyCashflowEur = annualCashflowEurYr1 / 12;
@@ -408,6 +470,7 @@ function calcScenario(s, global){
     totalAcqCostAed, totalAcqCostEur,
     cashInvestedEur,
     noiAedYr1, noiEurYr1,
+    svcChargesAed: svcCharges,
     annualDebtServiceEur: annualDebtServiceEurShown,
     monthlyCashflowEur, monthlyCashflowAed, monthlyCashflowInr,
     netYield, cashOnCash, irr: irrVal
@@ -497,13 +560,12 @@ function scenarioCardHtml(key, s){
     <div class="card" data-scenario="${key}">
       <div class="scHead">
         <div class="scTitle">
-          <!-- Title includes emirate so it visibly updates when emirate changes -->
-          <h3 id="title-${key}">${esc(key)}: ${esc(s.name)} (${esc(s.emirate)})</h3>
+          <h3 id="title-${key}">${esc(key)}: ${esc(s.name)}</h3>
           <span class="modepill" id="badge-mode-${key}">${esc(s.financingMode)}</span>
         </div>
         <div class="meta">
-          <span class="metapill">Emirate: <b id="emirate-display-${key}">${esc(s.emirate)}</b></span>
-          <span class="metapill">FX: <b id="fx-display-${key}">1 EUR = ${esc(s.fxAedPerEur)} AED</b></span>
+          <span class="metapill"><b id="emirate-display-${key}">${esc(s.emirate)}</b></span>
+          <span class="metapill"><b id="residency-display-${key}">${esc(s.residency)}</b></span>
         </div>
 
         <div class="kpis" aria-label="Key metrics">
@@ -517,36 +579,41 @@ function scenarioCardHtml(key, s){
       <div class="card__body">
         ${detailsBlock("Property", true, `
           <div class="inputrow">
-            ${inputText(key,"name","Scenario name",s.name,"Your label for this scenario")}
-            ${select(key,"emirate","Emirate",s.emirate,["Dubai","Abu Dhabi"],"Affects typical registration defaults")}
+            ${inputText(key,"name","Scenario name",s.name,"Your label")}
+            ${select(key,"emirate","Emirate",s.emirate,["Dubai","Abu Dhabi"])}
             ${select(key,"unitType","Unit type",s.unitType,["Studio","1BHK","2BHK"])}
-            ${checkbox(key,"offPlan","Off-plan",s.offPlan,"Stored for now (future: payment plan modelling)")}
-            ${inputNumber(key,"purchasePriceAed","Purchase price (AED)",s.purchasePriceAed,1,"AED",0,"Total unit price in AED")}
-            ${inputNumber(key,"annualRentAed","Gross rent / year (AED)",s.annualRentAed,1,"AED",0,"Expected annual rent in AED")}
-            ${inputNumber(key,"vacancyPct","Vacancy (%)",s.vacancyPct,0.1,null,0,"% of year vacant / unpaid")}
-            ${inputNumber(key,"serviceChargesAedYr","Service charges / year (AED)",s.serviceChargesAedYr,1,"AED",0,"Community/service charges in AED per year")}
+            ${inputNumber(key,"unitSizeSqFt","Unit size (sq ft)",s.unitSizeSqFt,1,null,0)}
+            ${checkbox(key,"offPlan","Off-plan Property",s.offPlan,"Enables developer plan options & fee logic")}
+          </div>
+          <div class="inputrow" style="margin-top:12px">
+            ${inputNumber(key,"purchasePriceAed","Purchase price (AED)",s.purchasePriceAed,1,"AED",0,"Base price")}
+            ${inputNumber(key,"annualRentAed","Gross rent / year (AED)",s.annualRentAed,1,"AED",0)}
+            ${inputNumber(key,"vacancyPct","Vacancy (%)",s.vacancyPct,0.1,null,0,"5% standard, 15-20% short-term")}
+            ${select(key,"rentalStrategy","Rental Strategy",s.rentalStrategy,["Long-term","Short-term"],"Affects Mgmt Fee default")}
           </div>
         `)}
 
         ${detailsBlock("Upfront costs", false, `
           <div class="inputrow">
-            ${inputNumber(key,"regFeePct","Registration fee (%)",s.regFeePct,0.01,null,0,"Dubai often ~4%; Abu Dhabi often ~2% (check)")}
-            ${inputNumber(key,"regAdminAed","Registration admin (AED)",s.regAdminAed,1,"AED",0)}
-            ${inputNumber(key,"agentPct","Agent fee (%)",s.agentPct,0.01,null,0)}
+            ${inputNumber(key,"regFeePct","DLD/Reg fee (%)",s.regFeePct,0.01,null,0,"4% Dubai, 2% AD")}
+            ${inputNumber(key,"regAdminAed","Reg/Admin fee (AED)",s.regAdminAed,1,"AED",0,"~580 AED Sec, ~55k AED (15k USD) Off-Plan Admin")}
+            ${inputNumber(key,"agentPct","Agency fee (%)",s.agentPct,0.01,null,0,"2% Secondary, 0% Off-plan")}
             ${inputNumber(key,"vatPct","VAT on agent fee (%)",s.vatPct,0.01,null,0)}
-            ${inputNumber(key,"trusteeFeeAed","Trustee / admin (AED)",s.trusteeFeeAed,1,"AED",0)}
+            ${inputNumber(key,"trusteeFeeAed","Trustee/Legal (AED)",s.trusteeFeeAed,1,"AED",0,"~5k USD Secondary")}
             ${inputNumber(key,"nocFeeAed","NOC fee (AED)",s.nocFeeAed,1,"AED",0)}
-            ${inputNumber(key,"furnitureAed","Furniture / setup (AED)",s.furnitureAed,1,"AED",0)}
+            ${inputNumber(key,"furnitureAed","Furniture (AED)",s.furnitureAed,1,"AED",0)}
             ${inputNumber(key,"otherUpfrontAed","Other upfront (AED)",s.otherUpfrontAed,1,"AED",0)}
           </div>
         `)}
 
-        ${detailsBlock("Operating assumptions", false, `
+        ${detailsBlock("Operating costs", false, `
           <div class="inputrow">
-            ${inputNumber(key,"mgmtPct","Property mgmt (% of collected rent)",s.mgmtPct,0.01,null,0)}
-            ${inputNumber(key,"maintPct","Maintenance reserve (% of collected rent)",s.maintPct,0.01,null,0)}
+            ${inputNumber(key,"serviceChargeRate","Service Charge (AED/sq ft)",s.serviceChargeRate,0.1,null,0,"Avg 14-20 AED/sqft")}
+            ${inputNumber(key,"serviceChargesAedYr","Total Service Chg (AED)",s.serviceChargesAedYr,1,"AED",0,"Auto-calcs if Rate & Size set")}
+            ${inputNumber(key,"mgmtPct","Property mgmt (%)",s.mgmtPct,0.01,null,0,"5-8% Long-term, 20% Short-term")}
+            ${inputNumber(key,"maintPct","Maintenance reserve (%)",s.maintPct,0.01,null,0)}
             ${inputNumber(key,"insuranceAedYr","Insurance / year (AED)",s.insuranceAedYr,1,"AED",0)}
-            ${inputNumber(key,"otherOpAedYr","Other operating / year (AED)",s.otherOpAedYr,1,"AED",0)}
+            ${inputNumber(key,"otherOpAedYr","Other operating (AED)",s.otherOpAedYr,1,"AED",0,"Utilities for Short-term")}
             ${inputNumber(key,"rentGrowthPct","Rent growth (%/yr)",s.rentGrowthPct,0.01,null,0)}
             ${inputNumber(key,"expenseGrowthPct","Expense growth (%/yr)",s.expenseGrowthPct,0.01,null,0)}
           </div>
@@ -554,21 +621,30 @@ function scenarioCardHtml(key, s){
 
         ${detailsBlock("Financing", true, `
           <div class="inputrow">
-            ${select(key,"financingMode","Financing mode",s.financingMode,["Cash","UAE Mortgage","NL Loan"],"Choose how you fund the purchase")}
-            ${inputNumber(key,"fxAedPerEur","FX: 1 EUR = (AED)",s.fxAedPerEur,0.0001,null,0,"Used for all AED↔EUR conversions")}
+            ${select(key,"financingMode","Financing mode",s.financingMode,["Cash","UAE Mortgage","Dev Plan","NL Loan"])}
+            ${select(key,"residency","Residency Status",s.residency,["Resident","Non-Resident"],"Affects Min Down Payment")}
+            ${inputNumber(key,"fxAedPerEur","FX: 1 EUR = (AED)",s.fxAedPerEur,0.0001,null,0)}
           </div>
 
           <div class="subcard" id="uae-mortgage-${key}" style="display:none;">
             <div class="hint"><b>UAE Mortgage</b></div>
             <div class="inputrow">
-              ${inputNumber(key,"uaeDownPct","Down payment (%)",s.uaeDownPct,0.1,null,0)}
+              ${inputNumber(key,"uaeDownPct","Down payment (%)",s.uaeDownPct,0.1,null,0,"20% Res, 40% Non-Res")}
               ${inputNumber(key,"uaeRatePct","Interest rate (%/yr)",s.uaeRatePct,0.01,null,0)}
               ${inputNumber(key,"uaeTermYrs","Term (years)",s.uaeTermYrs,1,null,1)}
               ${inputNumber(key,"uaeBankFeePct","Bank fee (% of loan)",s.uaeBankFeePct,0.01,null,0)}
-              ${inputNumber(key,"uaeBankFeeAed","Bank fee (fixed AED)",s.uaeBankFeeAed,1,"AED",0)}
-              ${inputNumber(key,"uaeMortgageRegPct","Mortgage registration (% of loan)",s.uaeMortgageRegPct,0.01,null,0)}
+              ${inputNumber(key,"uaeMortgageRegPct","Mortgage reg (%)",s.uaeMortgageRegPct,0.01,null,0,"0.25% Dubai")}
               ${inputNumber(key,"uaeMortgageRegAdminAed","Mortgage reg admin (AED)",s.uaeMortgageRegAdminAed,1,"AED",0)}
             </div>
+          </div>
+
+          <div class="subcard" id="dev-plan-${key}" style="display:none;">
+            <div class="hint"><b>Developer Payment Plan</b></div>
+            <div class="inputrow">
+              ${inputNumber(key,"devPlanPremiumPct","Price Premium (%)",s.devPlanPremiumPct,0.1,null,0,"Markup vs Cash price")}
+              ${inputNumber(key,"devPlanTermYrs","Plan Duration (years)",s.devPlanTermYrs,0.5,null,0.5,"Period to pay off balance")}
+            </div>
+            <div class="hint">Assumes interest-free payments spread over duration.</div>
           </div>
 
           <div class="subcard" id="nl-loan-${key}" style="display:none;">
@@ -581,7 +657,6 @@ function scenarioCardHtml(key, s){
               ${inputNumber(key,"nlBankFeePct","Bank fee (% of loan)",s.nlBankFeePct,0.01,null,0)}
               ${inputNumber(key,"nlBankFeeEur","Bank fee (fixed EUR)",s.nlBankFeeEur,0.01,"EUR",0)}
             </div>
-            <div class="hint">Cash invested ≈ (Total acquisition cost in EUR − Loan amount) + bank fees.</div>
           </div>
         `)}
 
@@ -590,8 +665,8 @@ function scenarioCardHtml(key, s){
             ${inputNumber(key,"holdYrs","Hold period (years)",s.holdYrs,1,null,1)}
             ${inputNumber(key,"appreciationPct","Price appreciation (%/yr)",s.appreciationPct,0.01,null,0)}
             ${inputNumber(key,"sellAgentPct","Selling agent fee (%)",s.sellAgentPct,0.01,null,0)}
-            ${inputNumber(key,"sellVatPct","VAT on selling agent fee (%)",s.sellVatPct,0.01,null,0)}
-            ${inputNumber(key,"sellOtherAed","Other selling costs (AED)",s.sellOtherAed,1,"AED",0)}
+            ${inputNumber(key,"sellVatPct","VAT on selling agent",s.sellVatPct,0.01,null,0)}
+            ${inputNumber(key,"sellOtherAed","Other selling costs (AED)",s.sellOtherAed,1,"AED",0,"NOC ~1-3k AED")}
           </div>
         `)}
       </div>
@@ -610,8 +685,10 @@ function showHideFinancingSections(){
   scenarioKeys.forEach(k => {
     const mode = state[k].financingMode;
     const uae = document.getElementById(`uae-mortgage-${k}`);
+    const dev = document.getElementById(`dev-plan-${k}`);
     const nl  = document.getElementById(`nl-loan-${k}`);
     if(uae) uae.style.display = (mode === "UAE Mortgage") ? "block" : "none";
+    if(dev) dev.style.display = (mode === "Dev Plan") ? "block" : "none";
     if(nl)  nl.style.display  = (mode === "NL Loan") ? "block" : "none";
   });
 }
@@ -640,84 +717,16 @@ function updateAllHints(){
     AED_FIELDS.forEach(f => updateFieldHint(k, f, "AED"));
     EUR_FIELDS.forEach(f => updateFieldHint(k, f, "EUR"));
   });
-  const aedPerEur = num(state.global.fxRates?.AED || FX_FALLBACK.AED);
-  const eurPerAed = aedPerEur > 0 ? (1 / aedPerEur) : 0;
   setText("fx-inr-eur-display", `1 EUR = ${num(state.global.inrPerEur).toLocaleString("en-GB",{maximumFractionDigits:2})} INR`);
-  setText("fx-aed-eur-display", `1 EUR = ${aedPerEur.toLocaleString("en-GB",{maximumFractionDigits:4})} AED (${eurPerAed.toFixed(4)} EUR per AED)`);
-  setText("fx-source-display", state.global.fxSource || "Live or fallback");
 }
 
-/* FX utilities */
-function updateFxUi(){
-  const fx = state.global.fxRates || FX_FALLBACK;
-  setText("fx-usd", `${num(fx.USD).toFixed(4)} USD`);
-  setText("fx-eur", `${num(fx.AED).toFixed(4)} AED`);
-  setText("fx-gbp", `${num(fx.GBP).toFixed(4)} GBP`);
-  setText("fx-inr", `${num(fx.INR).toFixed(2)} INR`);
-
-  const eurPerAed = fx.AED > 0 ? (1 / fx.AED) : 0;
-  setText("fx-eur-inverse", fx.AED ? `1 AED ≈ ${eurPerAed.toFixed(4)} EUR` : "1 AED ≈ — EUR");
-  setText("fx-updated", fxLastFetched ? `Last updated: ${fxLastFetched.toLocaleString()}` : "Using cached/fallback rates");
-  setText("fx-source", state.global.fxSource ? `Exchange rates powered by fastforex.io • ${state.global.fxSource}` : "Exchange rates powered by fastforex.io");
-  updateAllHints();
-}
-
-async function fetchLiveFx(){
-  const sourceEl = document.getElementById("fx-source");
-  try{
-    if(sourceEl) sourceEl.textContent = "Loading live rates...";
-    const resp = await fetch(FX_ENDPOINT);
-    if(!resp.ok) throw new Error("Bad response");
-    const data = await resp.json();
-    const rates = data.results || data.rates;
-    if(!data || !rates) throw new Error("No rates");
-    state.global.fxRates = {
-      USD: num(rates.USD) || FX_FALLBACK.USD,
-      AED: num(rates.AED) || FX_FALLBACK.AED,
-      GBP: num(rates.GBP) || FX_FALLBACK.GBP,
-      INR: num(rates.INR) || FX_FALLBACK.INR
-    };
-    state.global.fxSource = "Live (fastforex.io)";
-    fxLastFetched = new Date();
-
-    state.global.inrPerEur = num(state.global.fxRates.INR);
-
-    saveState();
-    updateFxUi();
-    render();
-  }catch(err){
-    state.global.fxRates = FX_FALLBACK;
-    state.global.fxSource = "Fallback";
-    if(sourceEl) sourceEl.textContent = "Using fallback rates (couldn't reach live source)";
-    updateFxUi();
-  }
-}
-
-function applyEurRateToScenarios(){
-  const aedPerEur = num(state.global.fxRates?.AED || FX_FALLBACK.AED);
-  if(aedPerEur <= 0) return;
-  scenarioKeys.forEach(k => {
-    state[k].fxAedPerEur = aedPerEur;
-    const el = document.getElementById(`${k}-fxAedPerEur`);
-    if(el) el.value = aedPerEur.toFixed(4);
-  });
-  saveState();
-  updateAllHints();
-  recalcAndRender();
-}
-
-/* Basic input validation (non-negative for most numeric inputs) */
 function sanitizeInput(el){
   if(!el || el.type !== "number") return;
   const min = el.getAttribute("min");
   const minVal = min !== null ? num(min) : -Infinity;
-
   const v = num(el.value);
-  if(v < minVal){
-    el.classList.add("input--bad");
-  } else {
-    el.classList.remove("input--bad");
-  }
+  if(v < minVal) el.classList.add("input--bad");
+  else el.classList.remove("input--bad");
 }
 
 /* Wire all inputs */
@@ -727,7 +736,7 @@ function wireInputs(){
     const field = el.getAttribute("data-field");
 
     const handler = () => {
-      const prev = state[key][field];
+      const prev = clone(state[key]); // snapshot previous state
 
       if(el.type === "checkbox") state[key][field] = el.checked;
       else if(el.tagName === "SELECT" || el.type === "text") state[key][field] = el.value;
@@ -735,39 +744,82 @@ function wireInputs(){
 
       sanitizeInput(el);
 
-      // FIX: emirate changes should immediately update the visible header title/meta
+      /* LOGIC AUTOMATION */
+      
+      // 1. Emirate defaults
       if(field === "emirate"){
         const newEm = state[key].emirate;
-
-        // If regFeePct still equals the default of the previous emirate, auto-adjust to new default (nice UX)
-        const oldDefault = defaultRegFeePct(prev);
-        if(Math.abs(num(state[key].regFeePct) - oldDefault) < 0.001){
+        if(Math.abs(num(state[key].regFeePct) - defaultRegFeePct(prev.emirate)) < 0.001){
           state[key].regFeePct = defaultRegFeePct(newEm);
-          const regEl = document.getElementById(`${key}-regFeePct`);
-          if(regEl) regEl.value = state[key].regFeePct;
+          document.getElementById(`${key}-regFeePct`).value = state[key].regFeePct;
         }
-
-        const oldMort = defaultMortgageRegPct(prev);
-        if(Math.abs(num(state[key].uaeMortgageRegPct) - oldMort) < 0.001){
+        if(Math.abs(num(state[key].uaeMortgageRegPct) - defaultMortgageRegPct(prev.emirate)) < 0.001){
           state[key].uaeMortgageRegPct = defaultMortgageRegPct(newEm);
-          const mortEl = document.getElementById(`${key}-uaeMortgageRegPct`);
-          if(mortEl) mortEl.value = state[key].uaeMortgageRegPct;
+          document.getElementById(`${key}-uaeMortgageRegPct`).value = state[key].uaeMortgageRegPct;
         }
-
         setText(`emirate-display-${key}`, newEm);
-        setText(`title-${key}`, `${key}: ${state[key].name} (${newEm})`);
       }
 
-      if(field === "name"){
-        setText(`title-${key}`, `${key}: ${state[key].name} (${state[key].emirate})`);
+      // 2. Off-Plan Toggle Logic
+      if(field === "offPlan"){
+        const isOff = state[key].offPlan;
+        const agentInput = document.getElementById(`${key}-agentPct`);
+        const adminInput = document.getElementById(`${key}-regAdminAed`);
+        
+        if(isOff){
+          // Force Agent Fee to 0
+          state[key].agentPct = 0;
+          if(agentInput) agentInput.value = 0;
+          
+          // Suggest Developer Admin Fee (~15k USD = 55k AED)
+          state[key].regAdminAed = 55000;
+          if(adminInput) adminInput.value = 55000;
+        } else {
+           // Revert Admin Fee to standard Title Deed fee (~580 AED)
+           if(num(state[key].regAdminAed) === 55000){
+             state[key].regAdminAed = 580;
+             if(adminInput) adminInput.value = 580;
+           }
+           // Suggest 2% Agent Fee
+           state[key].agentPct = 2.0;
+           if(agentInput) agentInput.value = 2.0;
+        }
+      }
+
+      // 3. Residency Logic (Down Payment)
+      if(field === "residency"){
+         const isRes = (state[key].residency === "Resident");
+         const downInput = document.getElementById(`${key}-uaeDownPct`);
+         // 20% for Resident, 40% for Non-Resident (Secondary)
+         // Note: Off-plan is typically 20% regardless, but user can override.
+         const newDefault = isRes ? 20 : 40;
+         state[key].uaeDownPct = newDefault;
+         if(downInput) downInput.value = newDefault;
+         setText(`residency-display-${key}`, state[key].residency);
+      }
+
+      // 4. Rental Strategy Logic (Mgmt Fee)
+      if(field === "rentalStrategy"){
+         const isShort = (state[key].rentalStrategy === "Short-term");
+         const mgmtInput = document.getElementById(`${key}-mgmtPct`);
+         const newMgmt = isShort ? 20 : 8; // 20% vs 8%
+         state[key].mgmtPct = newMgmt;
+         if(mgmtInput) mgmtInput.value = newMgmt;
+      }
+
+      // 5. Service Charge Auto-Calc
+      if(field === "unitSizeSqFt" || field === "serviceChargeRate"){
+         const size = num(state[key].unitSizeSqFt);
+         const rate = num(state[key].serviceChargeRate);
+         if(size > 0 && rate > 0){
+           state[key].serviceChargesAedYr = size * rate;
+           const svcInput = document.getElementById(`${key}-serviceChargesAedYr`);
+           if(svcInput) svcInput.value = state[key].serviceChargesAedYr;
+         }
       }
 
       if(field === "financingMode"){
         setText(`badge-mode-${key}`, state[key].financingMode);
-      }
-
-      if(field === "fxAedPerEur"){
-        setText(`fx-display-${key}`, `1 EUR = ${num(state[key].fxAedPerEur).toLocaleString("en-GB",{maximumFractionDigits:4})} AED`);
       }
 
       showHideFinancingSections();
@@ -776,7 +828,6 @@ function wireInputs(){
       recalcAndRender();
     };
 
-    // Use both input + change to cover all browsers for selects
     el.addEventListener("input", handler);
     el.addEventListener("change", handler);
     sanitizeInput(el);
@@ -784,20 +835,15 @@ function wireInputs(){
 
   const inrInput = document.getElementById("global-inr-per-eur");
   if(inrInput){
-    inrInput.addEventListener("input", () => {
+    const h = () => {
       state.global.inrPerEur = num(inrInput.value);
       sanitizeInput(inrInput);
       saveState();
       updateAllHints();
       recalcAndRender();
-    });
-    inrInput.addEventListener("change", () => {
-      state.global.inrPerEur = num(inrInput.value);
-      sanitizeInput(inrInput);
-      saveState();
-      updateAllHints();
-      recalcAndRender();
-    });
+    };
+    inrInput.addEventListener("input", h);
+    inrInput.addEventListener("change", h);
     sanitizeInput(inrInput);
   }
 
@@ -807,15 +853,13 @@ function wireInputs(){
 /* Comparison table render */
 function renderCompare(rows, results){
   if(!compareBodyEl) return;
-
-  setText("th-a", `A: ${state.A.name} (${state.A.emirate})`);
-  setText("th-b", `B: ${state.B.name} (${state.B.emirate})`);
+  setText("th-a", `A: ${state.A.name}`);
+  setText("th-b", `B: ${state.B.name}`);
 
   compareBodyEl.innerHTML = rows.map(row => {
     const tds = scenarioKeys.map(k => {
       const valStr = row.fmt(state[k], results[k]);
       let cls = "";
-
       if(row.metric){
         const vals = scenarioKeys.map(kk => results[kk][row.metric]).filter(v => Number.isFinite(v));
         if(vals.length){
@@ -823,10 +867,8 @@ function renderCompare(rows, results){
           if(Number.isFinite(results[k][row.metric]) && Math.abs(results[k][row.metric] - best) < 1e-12) cls = "best";
         }
       }
-
       return `<td class="${cls}">${esc(valStr)}</td>`;
     }).join("");
-
     return `<tr><td>${esc(row.label)}</td>${tds}</tr>`;
   }).join("");
 }
@@ -838,15 +880,13 @@ function recalcAndRender(){
     B: calcScenario(state.B, state.global)
   };
 
-  // Title + meta (also fixes your “emirate not changing in header” issue)
   scenarioKeys.forEach(k => {
-    setText(`title-${k}`, `${k}: ${state[k].name} (${state[k].emirate})`);
+    setText(`title-${k}`, `${k}: ${state[k].name}`);
     setText(`emirate-display-${k}`, state[k].emirate);
+    setText(`residency-display-${k}`, state[k].residency);
     setText(`badge-mode-${k}`, state[k].financingMode);
-    setText(`fx-display-${k}`, `1 EUR = ${num(state[k].fxAedPerEur).toLocaleString("en-GB",{maximumFractionDigits:4})} AED`);
   });
 
-  // KPI tiles
   scenarioKeys.forEach(k => {
     const r = res[k];
     setText(`kpi-cf-${k}`, `${fmtMoney(r.monthlyCashflowAed,"AED")} / ${fmtMoney(r.monthlyCashflowEur,"EUR")}`);
@@ -855,79 +895,39 @@ function recalcAndRender(){
     setText(`kpi-irr-${k}`, fmtIrr(r.irr));
   });
 
-  // Comparison rows
   const rows = [
     { label:"Purchase price", fmt:(s, r) => `${fmtMoney(s.purchasePriceAed,"AED")} / ${fmtMoney(r.priceEur,"EUR")}` },
-    { label:"Gross rent (year 1)", fmt:(s, r) => `${fmtMoney(s.annualRentAed,"AED")} / ${fmtMoney(r.grossRentEurYr1,"EUR")}` },
-    { label:"Total acquisition cost", fmt:(s, r) => `${fmtMoney(r.totalAcqCostAed,"AED")} / ${fmtMoney(r.totalAcqCostEur,"EUR")}` },
-    { label:"Cash invested (upfront)", fmt:(s, r) => `${fmtMoney(r.cashInvestedEur,"EUR")} / ${fmtMoney(r.cashInvestedEur * num(state.global.inrPerEur),"INR")}` },
-    { label:"NOI (Year 1)", fmt:(s, r) => `${fmtMoney(r.noiAedYr1,"AED")} / ${fmtMoney(r.noiEurYr1,"EUR")}` },
-    { label:"Debt service (Year 1)", fmt:(s, r) => fmtMoney(r.annualDebtServiceEur,"EUR") },
-    { label:"Monthly cashflow (Year 1)", metric:"monthlyCashflowEur", better:"higher",
+    { label:"Gross rent (Yr 1)", fmt:(s, r) => `${fmtMoney(s.annualRentAed,"AED")} / ${fmtMoney(r.grossRentEurYr1,"EUR")}` },
+    { label:"Service Charges", fmt:(s, r) => `${fmtMoney(r.svcChargesAed,"AED")}` },
+    { label:"Total Acq Cost", fmt:(s, r) => `${fmtMoney(r.totalAcqCostAed,"AED")} / ${fmtMoney(r.totalAcqCostEur,"EUR")}` },
+    { label:"Cash Invested", fmt:(s, r) => `${fmtMoney(r.cashInvestedEur,"EUR")} / ${fmtMoney(r.cashInvestedEur * num(state.global.inrPerEur),"INR")}` },
+    { label:"NOI (Yr 1)", fmt:(s, r) => `${fmtMoney(r.noiAedYr1,"AED")} / ${fmtMoney(r.noiEurYr1,"EUR")}` },
+    { label:"Debt Service (Yr 1)", fmt:(s, r) => fmtMoney(r.annualDebtServiceEur,"EUR") },
+    { label:"Monthly Cashflow", metric:"monthlyCashflowEur", better:"higher",
       fmt:(s, r) => `${fmtMoney(r.monthlyCashflowAed,"AED")} / ${fmtMoney(r.monthlyCashflowEur,"EUR")} / ${fmtMoney(r.monthlyCashflowInr,"INR")}`
     },
-    { label:"Net yield (Year 1)", metric:"netYield", better:"higher",
+    { label:"Net Yield (Yr 1)", metric:"netYield", better:"higher",
       fmt:(s, r) => Number.isFinite(r.netYield) ? fmtPct(r.netYield * 100) : "n/a"
     },
-    { label:"Cash-on-cash (Year 1)", metric:"cashOnCash", better:"higher",
+    { label:"Cash-on-Cash (Yr 1)", metric:"cashOnCash", better:"higher",
       fmt:(s, r) => Number.isFinite(r.cashOnCash) ? fmtPct(r.cashOnCash * 100) : "n/a"
     },
     { label:"IRR (Hold)", metric:"irr", better:"higher", fmt:(s, r) => fmtIrr(r.irr) }
   ];
   renderCompare(rows, res);
 
-  // Bottom bar (AED/EUR/INR)
+  // Bottom bar
   const triple = (aed, eur, inr) => `${fmtMoney(aed,"AED")} • ${fmtMoney(eur,"EUR")} • ${fmtMoney(inr,"INR")}`;
-
-  setText("bottom-title-a", `A: ${state.A.name} (${state.A.emirate})`);
-  setText("bottom-title-b", `B: ${state.B.name} (${state.B.emirate})`);
-
+  setText("bottom-title-a", `A: ${state.A.name}`);
+  setText("bottom-title-b", `B: ${state.B.name}`);
   setText("bottom-price-a", triple(res.A.priceAed, res.A.priceEur, res.A.priceInr));
   setText("bottom-price-b", triple(res.B.priceAed, res.B.priceEur, res.B.priceInr));
-
   setText("bottom-rent-a", triple(res.A.grossRentAedYr1, res.A.grossRentEurYr1, res.A.grossRentInrYr1));
   setText("bottom-rent-b", triple(res.B.grossRentAedYr1, res.B.grossRentEurYr1, res.B.grossRentInrYr1));
-
   setText("bottom-cf-a", triple(res.A.monthlyCashflowAed, res.A.monthlyCashflowEur, res.A.monthlyCashflowInr));
   setText("bottom-cf-b", triple(res.B.monthlyCashflowAed, res.B.monthlyCashflowEur, res.B.monthlyCashflowInr));
-
-  setText("bottom-fx-a", `FX used: 1 EUR = ${res.A.fxAedPerEur} AED • 1 EUR = ${res.A.inrPerEur} INR`);
-  setText("bottom-fx-b", `FX used: 1 EUR = ${res.B.fxAedPerEur} AED • 1 EUR = ${res.B.inrPerEur} INR`);
-
-  renderChart(res);
-}
-
-function renderChart(res){
-  const ctx = document.getElementById("returns-chart");
-  if(!ctx || typeof Chart === "undefined") return;
-  const labels = ["Scenario A","Scenario B"];
-  const irrData = labels.map((_, idx) => {
-    const key = idx === 0 ? "A" : "B";
-    const v = res[key].irr;
-    return Number.isFinite(v) ? v * 100 : null;
-  });
-  const cocData = labels.map((_, idx) => {
-    const key = idx === 0 ? "A" : "B";
-    const v = res[key].cashOnCash;
-    return Number.isFinite(v) ? v * 100 : null;
-  });
-
-  if(fxChart) fxChart.destroy();
-  fxChart = new Chart(ctx, {
-    type:"bar",
-    data:{
-      labels,
-      datasets:[
-        { label:"IRR (%, hold period)", data:irrData, backgroundColor:"rgba(14,165,233,0.7)" },
-        { label:"Cash-on-cash (Year 1, %)", data:cocData, backgroundColor:"rgba(22,163,74,0.7)" }
-      ]
-    },
-    options:{
-      responsive:true,
-      scales:{ y:{ beginAtZero:true, ticks:{ callback:(v) => `${v}%` } } },
-      plugins:{ legend:{ position:"bottom" } }
-    }
-  });
+  setText("bottom-fx-a", `FX: 1 EUR = ${res.A.fxAedPerEur} AED • 1 EUR = ${res.A.inrPerEur} INR`);
+  setText("bottom-fx-b", `FX: 1 EUR = ${res.B.fxAedPerEur} AED • 1 EUR = ${res.B.inrPerEur} INR`);
 }
 
 /* Toolbar */
@@ -938,10 +938,9 @@ function wireToolbar(){
   const exportBtn= document.getElementById("btn-export");
 
   if(resetBtn) resetBtn.addEventListener("click", () => {
-    const fresh = clone(DEFAULTS);
-    state.global = fresh.global;
-    state.A = fresh.A;
-    state.B = fresh.B;
+    state.global = clone(DEFAULTS.global);
+    state.A = clone(DEFAULTS.A);
+    state.B = clone(DEFAULTS.B);
     saveState();
     render();
   });
@@ -973,52 +972,17 @@ function wireToolbar(){
   });
 }
 
-function wireFxButtons(){
-  const refresh = document.getElementById("btn-refresh-fx");
-  const apply = document.getElementById("btn-apply-eur");
-  if(refresh) refresh.addEventListener("click", fetchLiveFx);
-  if(apply) apply.addEventListener("click", applyEurRateToScenarios);
-}
-
-function wireBottomToggle(){
-  const btn = document.getElementById("toggle-bottom");
-  const summary = document.getElementById("bottom-summary");
-  if(!btn || !summary) return;
-  const syncLabel = () => {
-    const collapsed = summary.classList.contains("collapsed");
-    btn.setAttribute("aria-expanded", (!collapsed).toString());
-    btn.innerHTML = `${collapsed ? '<i class="fa-solid fa-arrow-up-wide-short me-2"></i>' : '<i class="fa-solid fa-arrow-down-wide-short me-2"></i>'}${collapsed ? 'Summary' : 'Hide summary'}`;
-  };
-  btn.addEventListener("click", () => {
-    summary.classList.toggle("collapsed");
-    syncLabel();
-  });
-
-  if(window.innerWidth > 900){
-    summary.classList.remove("collapsed");
-  }
-  syncLabel();
-}
-
-/* Render */
 function render(){
-  // Global inputs
   const inr = document.getElementById("global-inr-per-eur");
   if(inr) inr.value = num(state.global.inrPerEur);
 
-  // Scenario cards
   if(scenariosEl){
     scenariosEl.innerHTML = scenarioKeys.map(k => scenarioCardHtml(k, state[k])).join("");
   }
-
   wireInputs();
   updateAllHints();
   recalcAndRender();
 }
 
 wireToolbar();
-wireFxButtons();
-wireBottomToggle();
-updateFxUi();
 render();
-fetchLiveFx();
