@@ -608,7 +608,7 @@ function scenarioCardHtml(key, s){
 
         ${detailsBlock("Operating costs", false, `
           <div class="inputrow">
-            ${inputNumber(key,"serviceChargeRate","Service Charge (AED/sq ft)",s.serviceChargeRate,0.1,null,0,"Avg 14-20 AED/sqft")}
+            ${inputNumber(key,"serviceChargeRate","Service Charge (AED/sq ft)",s.serviceChargeRate,0.1,null,0,"Typical 11-22 AED/sqft (≈$3-6)")}
             ${inputNumber(key,"serviceChargesAedYr","Total Service Chg (AED)",s.serviceChargesAedYr,1,"AED",0,"Auto-calcs if Rate & Size set")}
             ${inputNumber(key,"mgmtPct","Property mgmt (%)",s.mgmtPct,0.01,null,0,"5-8% Long-term, 20% Short-term")}
             ${inputNumber(key,"maintPct","Maintenance reserve (%)",s.maintPct,0.01,null,0)}

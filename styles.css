@@ -359,6 +359,33 @@ details[open] .chev{transform:rotate(90deg)}
 .callout__k{color:var(--muted); font-size:.9rem}
 .callout__v{font-weight:850}
 
+/* Info grid */
+.info-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:14px;
+}
+.infocard{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow2);
+  padding:14px 16px;
+}
+.infocard h3{margin-bottom:4px}
+.infocard ul{margin:10px 0; padding-left:18px; line-height:1.55}
+.infocard li{margin-bottom:8px}
+.tag{
+  display:inline-block;
+  margin-left:4px;
+  padding:2px 8px;
+  border-radius:999px;
+  background:rgba(255,152,0,.12);
+  color:var(--accent2);
+  font-size:.85rem;
+  border:1px solid rgba(255,152,0,.22);
+}
+
 /* Bottom bar */
 .bottom{
   position:fixed;
