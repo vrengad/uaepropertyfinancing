@@ -462,6 +462,7 @@ function calcScenario(s, global){
   // Cashflows for IRR (EUR)
   const holdYrs = Math.max(1, Math.round(num(s.holdYrs)));
   const cashflowsEur = [];
+  const yearlyCashflowAed = [];
 
   let cashInvestedEur = aedToEur(totalAcqCostAed) + bankFeesEur;
 
@@ -504,6 +505,7 @@ function calcScenario(s, global){
     if(y === 1) annualCashflowEurYr1 = cashflowY_Eur;
 
     cashflowsEur.push(cashflowY_Eur);
+    yearlyCashflowAed.push(eurToAed(cashflowY_Eur));
   }
 
   // Exit (sell at end of hold)
@@ -515,11 +517,20 @@ function calcScenario(s, global){
   const saleNetAedBeforeDebt = salePriceAed - sellAgentAed - sellVatAed - sellOtherAed;
 
   let debtPayoffEur = 0;
-  if(s.financingMode === "UAE Mortgage" || s.financingMode === "Dev Plan") debtPayoffEur = aedToEur(remainingLoanAtExitAed);
-  else if(s.financingMode === "NL Loan") debtPayoffEur = remainingLoanAtExitEur;
+  let debtPayoffAed = 0;
+  if(s.financingMode === "UAE Mortgage" || s.financingMode === "Dev Plan") {
+    debtPayoffEur = aedToEur(remainingLoanAtExitAed);
+    debtPayoffAed = remainingLoanAtExitAed;
+  }
+  else if(s.financingMode === "NL Loan") {
+    debtPayoffEur = remainingLoanAtExitEur;
+    debtPayoffAed = eurToAed(remainingLoanAtExitEur);
+  }
 
   const saleProceedsEur = aedToEur(saleNetAedBeforeDebt) - debtPayoffEur;
   cashflowsEur[cashflowsEur.length - 1] += saleProceedsEur;
+  const saleProceedsAed = saleNetAedBeforeDebt - debtPayoffAed;
+  yearlyCashflowAed[yearlyCashflowAed.length - 1] += saleProceedsAed;
 
   const totalAcqCostEur = aedToEur(totalAcqCostAed);
   const noiEurYr1 = aedToEur(noiAedYr1);
@@ -546,7 +557,8 @@ function calcScenario(s, global){
     svcChargesAed: svcCharges,
     annualDebtServiceEur: annualDebtServiceEurShown,
     monthlyCashflowEur, monthlyCashflowAed, monthlyCashflowInr,
-    netYield, cashOnCash, irr: irrVal
+    netYield, cashOnCash, irr: irrVal,
+    yearlyCashflowAed
   };
 }
 
@@ -554,6 +566,7 @@ function calcScenario(s, global){
 const scenariosEl = document.getElementById("scenarios");
 const compareBodyEl = document.getElementById("compare-body");
 let performanceChart = null;
+let cashflowChart = null;
 
 const scenarioKeys = ["A","B"];
 const AED_FIELDS = [
@@ -999,6 +1012,7 @@ function recalcAndRender(){
   ];
   renderCompare(rows, res);
   renderPerformanceChart(res);
+  renderCashflowChart(res);
 
   // Bottom bar
   const triple = (aed, eur, inr) => `${fmtMoney(aed,"AED")} • ${fmtMoney(eur,"EUR")} • ${fmtMoney(inr,"INR")}`;
@@ -1043,6 +1057,37 @@ function renderPerformanceChart(results){
       responsive: true,
       scales: {
         y: { beginAtZero: true, ticks: { callback: (v) => typeof v === "number" ? v.toLocaleString() : v } }
+      },
+      plugins: {
+        legend: { display: true, position: "bottom" }
+      }
+    }
+  });
+}
+
+function renderCashflowChart(results){
+  const canvas = document.getElementById("cashflow-chart");
+  if(!canvas || typeof Chart === "undefined") return;
+
+  const maxYears = Math.max(results.A.yearlyCashflowAed.length, results.B.yearlyCashflowAed.length);
+  const labels = Array.from({ length: maxYears }, (_, i) => `Year ${i + 1}`);
+  const dataA = labels.map((_, i) => results.A.yearlyCashflowAed[i] ?? null);
+  const dataB = labels.map((_, i) => results.B.yearlyCashflowAed[i] ?? null);
+
+  if(cashflowChart) cashflowChart.destroy();
+  cashflowChart = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: `A: ${state.A.name}`, data: dataA, backgroundColor: "rgba(15,155,215,0.35)", borderColor: "rgba(15,155,215,0.8)", borderWidth:1 },
+        { label: `B: ${state.B.name}`, data: dataB, backgroundColor: "rgba(22,163,74,0.35)", borderColor: "rgba(22,163,74,0.8)", borderWidth:1 }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: (v) => typeof v === "number" ? v.toLocaleString() + " AED" : v } }
       },
       plugins: {
         legend: { display: true, position: "bottom" }
@@ -1101,11 +1146,20 @@ function wireFxSection(){
 function wireBottomToggle(){
   const bottom = document.querySelector(".bottom");
   const btn = document.getElementById("toggle-bottom");
-  if(!bottom || !btn) return;
-  btn.addEventListener("click", () => {
-    const open = bottom.classList.toggle("bottom--open");
+  const label = document.getElementById("bottom-toggle-label");
+  if(!bottom || !btn || !label) return;
+
+  const setOpen = (open) => {
+    bottom.classList.toggle("bottom--open", open);
+    document.body.classList.toggle("has-bottom-open", open);
     btn.setAttribute("aria-expanded", open ? "true" : "false");
-  });
+    label.textContent = open ? "Hide summary" : "Open summary";
+  };
+
+  const mql = window.matchMedia("(min-width: 993px)");
+  setOpen(mql.matches);
+  btn.addEventListener("click", () => setOpen(!bottom.classList.contains("bottom--open")));
+  mql.addEventListener("change", (evt) => setOpen(evt.matches));
 }
 
 function render(){

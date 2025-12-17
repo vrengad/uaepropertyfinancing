@@ -19,8 +19,8 @@ body{
   color:var(--text);
   font-family:var(--font);
   line-height:1.6;
-  padding-bottom:200px;
 }
+.has-bottom-open{padding-bottom:210px;}
 
 h1,h2,h3,h4,h5,h6{margin:0; font-weight:800; letter-spacing:-0.02em}
 p{margin:0}
@@ -97,7 +97,7 @@ details[open] .chev{transform:rotate(90deg)}
 .infocard li{margin-bottom:8px}
 .tag{display:inline-block; margin-left:4px; padding:2px 8px; border-radius:999px; background:rgba(22,163,74,.12); color:#15803d; border:1px solid rgba(22,163,74,.2)}
 
-.bottom{position:fixed; left:0; right:0; bottom:0; background:rgba(255,255,255,.96); backdrop-filter:blur(10px); border-top:1px solid var(--line); box-shadow:0 -12px 28px rgba(15,23,42,.1); z-index:50; transition:transform .25s ease}
+.bottom{position:fixed; left:0; right:0; bottom:0; background:rgba(255,255,255,.96); backdrop-filter:blur(10px); border-top:1px solid var(--line); box-shadow:0 -12px 28px rgba(15,23,42,.1); z-index:50; transition:transform .25s ease, opacity .25s ease; transform:translateY(105%); opacity:.98}
 .bottom__row{display:grid; grid-template-columns:1fr 1px 1fr; gap:14px; padding:12px 0}
 .bottom__divider{background:var(--line)}
 .bottom__title{font-weight:900; margin-bottom:6px}
@@ -107,14 +107,15 @@ details[open] .chev{transform:rotate(90deg)}
 .bottom__v{font-weight:900; margin-top:3px}
 .bottom__fx{margin-top:6px; color:var(--muted); font-size:.9rem}
 
+.bottom--open{transform:translateY(0); opacity:1}
 .bottom-toggle{position:fixed; right:16px; bottom:16px; z-index:60; box-shadow:0 14px 30px rgba(15,23,42,.25)}
 @media (max-width:992px){
-  body{padding-bottom:90px}
-  .bottom{transform:translateY(100%)}
-  .bottom.bottom--open{transform:translateY(0)}
+  .bottom{border-radius:18px 18px 0 0;}
+  .bottom__grid{grid-template-columns:1fr;}
 }
 @media (min-width:993px){
   .bottom-toggle{display:none}
+  .bottom__grid{grid-template-columns:repeat(3,1fr)}
 }
 
 .footer{padding:28px 0; background:#0f172a; color:rgba(255,255,255,.72)}
