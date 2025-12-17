@@ -153,8 +153,8 @@
       <div class="section__title d-flex align-items-center justify-content-between flex-wrap gap-3">
         <div>
           <p class="text-uppercase text-primary fw-bold small mb-1">Exchange Rates</p>
-          <h2 class="mb-1">Live FX (AED base)</h2>
-          <p class="muted mb-0">Pull the latest USD, EUR, GBP, and INR rates. Apply the EUR/AED rate to scenarios when needed.</p>
+          <h2 class="mb-1">Live FX (EUR base)</h2>
+          <p class="muted mb-0">Pull the latest AED, USD, GBP, and INR rates per EUR. Apply the EUR/AED rate to scenarios when needed.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
           <button id="btn-refresh-fx" class="btn btn--primary" type="button"><i class="fa-solid fa-rotate me-2"></i>Refresh rates</button>
@@ -166,20 +166,20 @@
         <div class="card__body">
           <div class="grid4" id="fx-cards">
             <div class="fx-card">
-              <div class="fx-label">USD per 1 AED</div>
+              <div class="fx-label">USD per 1 EUR</div>
               <div class="fx-value" id="fx-usd">—</div>
             </div>
             <div class="fx-card">
-              <div class="fx-label">EUR per 1 AED</div>
+              <div class="fx-label">AED per 1 EUR</div>
               <div class="fx-value" id="fx-eur">—</div>
-              <div class="fx-sub" id="fx-eur-inverse">1 EUR ≈ — AED</div>
+              <div class="fx-sub" id="fx-eur-inverse">1 AED ≈ — EUR</div>
             </div>
             <div class="fx-card">
-              <div class="fx-label">GBP per 1 AED</div>
+              <div class="fx-label">GBP per 1 EUR</div>
               <div class="fx-value" id="fx-gbp">—</div>
             </div>
             <div class="fx-card">
-              <div class="fx-label">INR per 1 AED</div>
+              <div class="fx-label">INR per 1 EUR</div>
               <div class="fx-value" id="fx-inr">—</div>
               <div class="fx-sub">Used for INR hints across the calculator</div>
             </div>
