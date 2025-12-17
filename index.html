@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>UAE Property Financing Calculator | Modern Mortgage & Cashflow Model</title>
   <meta name="description" content="Premium UAE property financing calculator to compare cash, UAE mortgages, developer payment plans, and foreign loans with real-time cashflow, IRR, and FX-aware outputs." />
+  <meta name="keywords" content="UAE mortgage calculator, Dubai property financing, Abu Dhabi home loan, developer payment plan, UAE IRR calculator, cashflow model" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,6 +42,7 @@
     </div>
   </header>
 
+  <!-- Hero photo from Unsplash; swap to a UAE skyline shot from Unsplash or Pexels for production use. -->
   <section id="home" class="hero text-white">
     <div class="hero__overlay"></div>
     <div class="container position-relative">
@@ -132,15 +134,26 @@
             </div>
           </div>
         </div>
-        <div class="col-lg-5">
-          <div class="card shadow-sm h-100">
+        <div class="col-lg-5 d-flex flex-column gap-4">
+          <div class="card shadow-sm flex-fill">
             <div class="card-body">
               <div class="d-flex align-items-center justify-content-between mb-3">
                 <h5 class="fw-bold mb-0">Performance snapshot</h5>
                 <span class="badge bg-primary-subtle text-primary">Live chart</span>
               </div>
               <canvas id="performance-chart" height="250" aria-label="Scenario performance chart"></canvas>
-              <p class="fineprint mt-3">Values shown in AED (cashflows) and percentages (yield/IRR).</p>
+              <p class="fineprint mt-3 mb-0">Values shown in AED (cashflows) and percentages (yield/IRR).</p>
+            </div>
+          </div>
+          <div class="card shadow-sm flex-fill">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="fw-bold mb-0">Cashflow runway</h5>
+                <span class="badge bg-success-subtle text-success">IRR inputs</span>
+              </div>
+              <!-- New chart to visualise yearly cashflows feeding the IRR calculation -->
+              <canvas id="cashflow-chart" height="200" aria-label="Yearly cashflow comparison chart"></canvas>
+              <p class="fineprint mt-3 mb-0">Shows annual net cashflows in AED across the hold period. Exit proceeds are included in the final year bar.</p>
             </div>
           </div>
         </div>
@@ -356,7 +369,7 @@
     </div>
   </div>
   <button class="bottom-toggle btn btn-primary" id="toggle-bottom" aria-controls="bottom-summary" aria-expanded="false">
-    <i class="fa-solid fa-chart-simple me-2"></i>Summary
+    <i class="fa-solid fa-chart-simple me-2"></i><span id="bottom-toggle-label">Open summary</span>
   </button>
 
   <footer class="footer text-center text-muted">
