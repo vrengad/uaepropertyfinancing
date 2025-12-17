@@ -13,43 +13,22 @@
   el.textContent = d.toLocaleDateString("en-GB", { weekday:"short", day:"2-digit", month:"short", year:"numeric" });
 })();
 
-/* -------- quotes -------- */
-const quotes = [
-  { tamil:"முயற்சி திருவினையாக்கும்.", english:"Effort will bring success." },
-  { tamil:"கற்றது கைமண் அளவு, கல்லாதது உலகளவு.", english:"What we have learned is small; what we haven't is vast." },
-  { tamil:"யாதும் ஊரே யாவரும் கேளிர்.", english:"All towns are ours; all people are our kin." },
-  { tamil:"தீதும் நன்றும் பிறர் தர வாரா.", english:"Good and bad do not come from others." },
-  { tamil:"ஒன்று பட்டால் உண்டு வாழ்வு.", english:"Unity is strength." },
-  { tamil:"அறம் செய்ய விரும்பு.", english:"Desire to do good deeds." }
-];
-
-const tamilQuoteEl = document.getElementById("tamil-quote");
-const englishMeaningEl = document.getElementById("english-meaning");
-const newQuoteBtn = document.getElementById("new-quote-btn");
-let currentQuoteIndex = -1;
-
-function showRandomQuote(){
-  if(!tamilQuoteEl || !englishMeaningEl) return;
-  let idx;
-  do { idx = Math.floor(Math.random() * quotes.length); }
-  while (idx === currentQuoteIndex && quotes.length > 1);
-
-  currentQuoteIndex = idx;
-  tamilQuoteEl.style.opacity = 0;
-  englishMeaningEl.style.opacity = 0;
-
-  setTimeout(() => {
-    tamilQuoteEl.textContent = `"${quotes[idx].tamil}"`;
-    englishMeaningEl.textContent = quotes[idx].english;
-    tamilQuoteEl.style.opacity = 1;
-    englishMeaningEl.style.opacity = 1;
-  }, 160);
-}
-
-if(newQuoteBtn) newQuoteBtn.addEventListener("click", showRandomQuote);
-showRandomQuote();
+const yearEl = document.getElementById("year");
+if(yearEl) yearEl.textContent = new Date().getFullYear();
 
 /* -------- helpers -------- */
+const FX_STORAGE_KEY = "uaePropertyFinancing.fxCache";
+const FX_FALLBACK = {
+  fetchedAt: "fallback",
+  source: "Open ER fallback",
+  rates: {
+    base: "AED",
+    USD: 0.2723,
+    EUR: 0.2519,
+    GBP: 0.2154,
+    INR: 22.6
+  }
+};
 const STORAGE_KEY = "uaePropertyFinancing.v4";
 
 const num = (v) => {
@@ -73,6 +52,99 @@ function fmtIrr(v){
   return Number.isFinite(v) ? fmtPct(v * 100) : "n/a";
 }
 function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+function updateFxDisplay(snapshot, status){
+  const derived = deriveFx(snapshot);
+  const statusEl = document.getElementById("fx-status");
+  const heroFx = document.getElementById("hero-fx-status");
+  if(statusEl){
+    statusEl.textContent = status;
+    statusEl.className = status.includes("Live") ? "badge bg-success-subtle text-success" : "badge bg-warning-subtle text-dark";
+  }
+  if(heroFx) heroFx.textContent = status.includes("Live") ? "with live FX" : "with cached FX";
+  setText("fx-eur-aed", `${derived.aedPerEur.toFixed(4)} AED`);
+  setText("fx-usd-aed", `${derived.aedPerUsd.toFixed(4)} AED`);
+  setText("fx-gbp-aed", `${derived.aedPerGbp.toFixed(4)} AED`);
+  setText("fx-eur-inr", `${derived.inrPerEur.toFixed(2)} INR`);
+}
+
+function applyFxSnapshot(snapshot, isLive){
+  fxSnapshot = snapshot || FX_FALLBACK;
+  const derived = deriveFx(fxSnapshot);
+  state.global.inrPerEur = derived.inrPerEur;
+  state.A.fxAedPerEur = derived.aedPerEur;
+  state.B.fxAedPerEur = derived.aedPerEur;
+
+  const inrInput = document.getElementById("global-inr-per-eur");
+  if(inrInput) inrInput.value = state.global.inrPerEur.toFixed(2);
+  const fxA = document.getElementById("A-fxAedPerEur");
+  if(fxA) fxA.value = state.A.fxAedPerEur.toFixed(4);
+  const fxB = document.getElementById("B-fxAedPerEur");
+  if(fxB) fxB.value = state.B.fxAedPerEur.toFixed(4);
+
+  const sourceEl = document.getElementById("fx-source");
+  if(sourceEl) sourceEl.textContent = `Exchange rates powered by ${fxSnapshot.source || "open.er-api.com"} (${fxSnapshot.fetchedAt || "cached"})`;
+
+  updateFxDisplay(fxSnapshot, isLive ? "Live" : "Cached / fallback");
+  saveState();
+  updateAllHints();
+  recalcAndRender();
+}
+
+async function refreshFxRates(){
+  const badge = document.getElementById("fx-status");
+  if(badge){
+    badge.textContent = "Updating…";
+    badge.className = "badge bg-info-subtle text-info";
+  }
+  try{
+    const res = await fetch("https://open.er-api.com/v6/latest/AED");
+    if(!res.ok) throw new Error("Network");
+    const data = await res.json();
+    if(data.result !== "success" || !data.rates) throw new Error("Bad payload");
+    const snapshot = {
+      fetchedAt: data.time_last_update_utc || new Date().toISOString(),
+      source: "open.er-api.com",
+      rates: {
+        base: "AED",
+        USD: data.rates.USD,
+        EUR: data.rates.EUR,
+        GBP: data.rates.GBP,
+        INR: data.rates.INR
+      }
+    };
+    saveFxCache(snapshot);
+    applyFxSnapshot(snapshot, true);
+  }catch(err){
+    console.warn("FX refresh failed, using cached/fallback", err);
+    applyFxSnapshot(fxSnapshot || FX_FALLBACK, false);
+  }
+}
+
+function loadFxCache(){
+  try{
+    const raw = localStorage.getItem(FX_STORAGE_KEY);
+    if(!raw) return FX_FALLBACK;
+    const parsed = JSON.parse(raw);
+    if(!parsed || !parsed.rates) return FX_FALLBACK;
+    return parsed;
+  }catch{
+    return FX_FALLBACK;
+  }
+}
+function saveFxCache(data){
+  try{ localStorage.setItem(FX_STORAGE_KEY, JSON.stringify(data)); }catch{}
+}
+
+function deriveFx(snapshot){
+  const rates = snapshot?.rates || FX_FALLBACK.rates;
+  const aedPerEur = rates.EUR ? 1 / rates.EUR : 4.0;
+  const aedPerUsd = rates.USD ? 1 / rates.USD : 3.67;
+  const aedPerGbp = rates.GBP ? 1 / rates.GBP : 4.6;
+  const inrPerAed = rates.INR || 22.0;
+  const inrPerEur = aedPerEur * inrPerAed;
+  return { aedPerEur, aedPerUsd, aedPerGbp, inrPerAed, inrPerEur };
+}
 
 /* Default Logic */
 function defaultRegFeePct(emirate){ return emirate === "Abu Dhabi" ? 2.0 : 4.0; }
@@ -274,6 +346,7 @@ function loadState(){
   }
 }
 const state = loadState();
+let fxSnapshot = loadFxCache();
 
 function saveState(){
   try{
@@ -480,6 +553,7 @@ function calcScenario(s, global){
 /* -------- UI rendering -------- */
 const scenariosEl = document.getElementById("scenarios");
 const compareBodyEl = document.getElementById("compare-body");
+let performanceChart = null;
 
 const scenarioKeys = ["A","B"];
 const AED_FIELDS = [
@@ -623,7 +697,10 @@ function scenarioCardHtml(key, s){
           <div class="inputrow">
             ${select(key,"financingMode","Financing mode",s.financingMode,["Cash","UAE Mortgage","Dev Plan","NL Loan"])}
             ${select(key,"residency","Residency Status",s.residency,["Resident","Non-Resident"],"Affects Min Down Payment")}
-            ${inputNumber(key,"fxAedPerEur","FX: 1 EUR = (AED)",s.fxAedPerEur,0.0001,null,0)}
+            <div>
+              <label>FX source</label>
+              <div class="hint">Live rates set under the <b>Exchange rates</b> section.</div>
+            </div>
           </div>
 
           <div class="subcard" id="uae-mortgage-${key}" style="display:none;">
@@ -712,10 +789,16 @@ function updateFieldHint(key, field, currency){
     hintEl.textContent = `≈ ${fmtMoney(aed,"AED")} • ≈ ${fmtMoney(inr,"INR")}`;
   }
 }
+function updateFxHint(key){
+  const el = document.getElementById(`hint-${key}-fxAedPerEur`);
+  if(!el) return;
+  el.textContent = `Used for ${key} AED ↔ EUR conversions`;
+}
 function updateAllHints(){
   scenarioKeys.forEach(k => {
     AED_FIELDS.forEach(f => updateFieldHint(k, f, "AED"));
     EUR_FIELDS.forEach(f => updateFieldHint(k, f, "EUR"));
+    updateFxHint(k);
   });
   setText("fx-inr-eur-display", `1 EUR = ${num(state.global.inrPerEur).toLocaleString("en-GB",{maximumFractionDigits:2})} INR`);
 }
@@ -915,6 +998,7 @@ function recalcAndRender(){
     { label:"IRR (Hold)", metric:"irr", better:"higher", fmt:(s, r) => fmtIrr(r.irr) }
   ];
   renderCompare(rows, res);
+  renderPerformanceChart(res);
 
   // Bottom bar
   const triple = (aed, eur, inr) => `${fmtMoney(aed,"AED")} • ${fmtMoney(eur,"EUR")} • ${fmtMoney(inr,"INR")}`;
@@ -928,6 +1012,43 @@ function recalcAndRender(){
   setText("bottom-cf-b", triple(res.B.monthlyCashflowAed, res.B.monthlyCashflowEur, res.B.monthlyCashflowInr));
   setText("bottom-fx-a", `FX: 1 EUR = ${res.A.fxAedPerEur} AED • 1 EUR = ${res.A.inrPerEur} INR`);
   setText("bottom-fx-b", `FX: 1 EUR = ${res.B.fxAedPerEur} AED • 1 EUR = ${res.B.inrPerEur} INR`);
+}
+
+function renderPerformanceChart(results){
+  const canvas = document.getElementById("performance-chart");
+  if(!canvas || typeof Chart === "undefined") return;
+  const labels = ["Monthly CF (AED)", "Net Yield %", "IRR %"];
+  const dataA = [
+    results.A.monthlyCashflowAed,
+    Number.isFinite(results.A.netYield) ? results.A.netYield * 100 : 0,
+    Number.isFinite(results.A.irr) ? results.A.irr * 100 : 0
+  ];
+  const dataB = [
+    results.B.monthlyCashflowAed,
+    Number.isFinite(results.B.netYield) ? results.B.netYield * 100 : 0,
+    Number.isFinite(results.B.irr) ? results.B.irr * 100 : 0
+  ];
+
+  if(performanceChart) performanceChart.destroy();
+  performanceChart = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: `A: ${state.A.name}`, data: dataA, backgroundColor: "rgba(15,155,215,0.5)", borderColor: "rgba(15,155,215,0.9)", borderWidth:1 },
+        { label: `B: ${state.B.name}`, data: dataB, backgroundColor: "rgba(22,163,74,0.5)", borderColor: "rgba(22,163,74,0.9)", borderWidth:1 }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: (v) => typeof v === "number" ? v.toLocaleString() : v } }
+      },
+      plugins: {
+        legend: { display: true, position: "bottom" }
+      }
+    }
+  });
 }
 
 /* Toolbar */
@@ -972,6 +1093,21 @@ function wireToolbar(){
   });
 }
 
+function wireFxSection(){
+  const refreshBtn = document.getElementById("refresh-fx");
+  if(refreshBtn) refreshBtn.addEventListener("click", refreshFxRates);
+}
+
+function wireBottomToggle(){
+  const bottom = document.querySelector(".bottom");
+  const btn = document.getElementById("toggle-bottom");
+  if(!bottom || !btn) return;
+  btn.addEventListener("click", () => {
+    const open = bottom.classList.toggle("bottom--open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+}
+
 function render(){
   const inr = document.getElementById("global-inr-per-eur");
   if(inr) inr.value = num(state.global.inrPerEur);
@@ -985,4 +1121,8 @@ function render(){
 }
 
 wireToolbar();
+wireFxSection();
+wireBottomToggle();
 render();
+applyFxSnapshot(fxSnapshot, false);
+refreshFxRates();
