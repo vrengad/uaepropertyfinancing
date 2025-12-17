@@ -3,94 +3,71 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>UAE Property Financing Calculator | Compare UAE Mortgages & Cash Options</title>
-  <meta name="description" content="Premium UAE property financing calculator. Compare UAE mortgages, foreign loans, and cash purchases with live FX, IRR, cashflow, and buy-to-let metrics. Runs fully in-browser." />
+  <title>UAE Property Financing</title>
+  <meta name="description" content="Compare UAE buy-to-let scenarios (Cash / Mortgage / Dev Plan) with cashflow, yield, CoC, and IRR. Runs fully in-browser." />
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SzlrxWriC3fWlj+eYBf3z6Yf1d3hcxT1n6K2e+4i0I1p2V1YdKQ8a4JVXu2fLG3gBrWE1n4nZ9WkX1srSuFw2g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
-  <header class="navbar navbar-expand-lg shadow-sm sticky-top bg-white" id="top">
-    <div class="container-xl py-2">
-      <a class="navbar-brand d-flex align-items-center gap-2" href="#home">
-        <div class="brand-mark">UPF</div>
-        <div>
-          <div class="fw-bold text-primary">UAE Property Financing</div>
-          <small class="text-muted">Trusted investment calculator</small>
-        </div>
-      </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu" aria-controls="navMenu" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <nav class="collapse navbar-collapse" id="navMenu">
-        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
-          <li class="nav-item"><a class="nav-link" href="#home">Home</a></li>
-          <li class="nav-item"><a class="nav-link" href="#calculator">Calculator</a></li>
-          <li class="nav-item"><a class="nav-link" href="#comparison">Comparison</a></li>
-          <li class="nav-item"><a class="nav-link" href="#fx">FX</a></li>
-          <li class="nav-item"><a class="nav-link" href="#about">About</a></li>
-          <li class="nav-item"><a class="btn btn-primary" href="mailto:vrengad@gmail.com">Get Consultation</a></li>
-        </ul>
-      </nav>
-    </div>
-  </header>
 
-  <section id="home" class="hero text-light">
-    <div class="overlay"></div>
-    <div class="container-xl position-relative">
-      <div class="row align-items-center g-4">
-        <div class="col-lg-6">
-          <p class="badge rounded-pill bg-success-subtle text-success-emphasis mb-3">
-            <i class="fa-solid fa-bolt me-2"></i> Real-time, private, GitHub Pages friendly
-          </p>
-          <h1 class="display-5 fw-bold">Compare UAE Mortgages, Foreign Loans & Cash Purchases Instantly</h1>
-          <p class="lead text-light-75">Professional-grade cashflow, yield, CoC, and IRR modelling for UAE buy-to-let investors. Live FX rates, export, and autosave—all in your browser.</p>
-          <div class="d-flex gap-3 flex-wrap">
-            <a class="btn btn-lg btn-primary" href="#calculator">Launch Calculator</a>
-            <a class="btn btn-lg btn-outline-light" href="mailto:vrengad@gmail.com">Get personalized consultation</a>
-          </div>
-          <div class="d-flex gap-4 mt-4 flex-wrap text-light-75">
-            <div><i class="fa-solid fa-shield-halved me-2"></i>Data stays on your device</div>
-            <div><i class="fa-solid fa-rotate me-2"></i>Auto-save & export</div>
-            <div><i class="fa-solid fa-chart-line me-2"></i>IRR with FX assumptions</div>
-          </div>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar__row">
+      <div>
+        <div class="brand">
+          <span class="brand__dot"></span>
+          <h1>UAE Property Financing</h1>
         </div>
-        <div class="col-lg-6">
-          <div class="glass p-4 rounded-4 shadow-lg">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <div>
-                <div class="text-uppercase small text-light-75">Today</div>
-                <div id="gregorian-date" class="fs-5 fw-semibold">—</div>
-              </div>
-              <div class="text-end">
-                <div class="text-uppercase small text-light-75">Scenarios</div>
-                <div class="fs-5 fw-semibold">A & B</div>
-              </div>
-            </div>
-            <div class="progress" role="progressbar" aria-label="Funding mix" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100">
-              <div class="progress-bar bg-info" style="width: 45%">UAE Mortgage</div>
-            </div>
-            <div class="mt-3 text-light-75">Ready to compare NL loans vs UAE mortgage? Jump in below.</div>
-          </div>
+        <p class="sub">Compare 2 scenarios (A/B). Auto-saves in your browser.</p>
+      </div>
+
+      <div class="topbar__right">
+        <div class="pill" aria-label="Today">
+          <span class="pill__label">Today</span>
+          <span id="gregorian-date" class="pill__value">—</span>
         </div>
       </div>
     </div>
-  </section>
+  </header>
 
-  <main class="container-xl my-5">
-    <section id="calculator" class="mb-5">
-      <div class="section__title d-flex align-items-center justify-content-between">
-        <div>
-          <p class="text-uppercase text-primary fw-bold small mb-1">Calculator</p>
-          <h2 class="mb-1">Scenarios</h2>
-          <p class="muted mb-0">Compare UAE mortgage vs foreign loan vs cash with full cost breakdown.</p>
+  <main class="wrap">
+
+    <section class="section">
+      <div class="section__title">
+        <h2>Currency</h2>
+        <p class="muted">AED inputs show an instant EUR + INR hint.</p>
+      </div>
+
+      <div class="card">
+        <div class="card__body grid2">
+          <div>
+            <label for="global-inr-per-eur">FX: 1 EUR = (INR)</label>
+            <input id="global-inr-per-eur" type="number" step="0.01" min="0" inputmode="decimal" />
+            <div class="hint" id="global-inr-hint">Used for INR conversions (hints + bottom bar).</div>
+          </div>
+
+          <div class="callout">
+            <div class="callout__title">Exchange rates used</div>
+            <div class="callout__row">
+              <div class="callout__k">INR per EUR</div>
+              <div class="callout__v" id="fx-inr-eur-display">—</div>
+            </div>
+            <div class="callout__row">
+              <div class="callout__k">AED per EUR</div>
+              <div class="callout__v muted">Set per scenario under <b>Financing</b>.</div>
+            </div>
+          </div>
         </div>
-        <span id="autosave-badge" class="badge badge--save" aria-live="polite">Auto-saved</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__title">
+        <h2>Scenarios</h2>
+        <p class="muted">Tip: Compare Off-Plan (Dev Plan) vs Secondary (Mortgage).</p>
       </div>
 
       <div class="toolbar" role="toolbar" aria-label="Scenario tools">
@@ -106,21 +83,20 @@
         <button id="btn-export" class="btn btn--ghost" type="button" title="Export your scenarios as JSON">
           <span class="ico" aria-hidden="true">⬇</span> Export
         </button>
+
+        <span id="autosave-badge" class="badge badge--save" aria-live="polite">Auto-saved</span>
       </div>
 
       <div id="scenarios" class="scenarios" aria-label="Scenario comparison grid"></div>
     </section>
 
-    <section id="comparison" class="section">
+    <section class="section">
       <div class="section__title">
-        <div>
-          <p class="text-uppercase text-primary fw-bold small mb-1">Performance</p>
-          <h2 class="mb-1">Comparison</h2>
-          <p class="muted">Best value per row is highlighted. Chart includes IRR and cash-on-cash for quick visuals.</p>
-        </div>
+        <h2>Comparison</h2>
+        <p class="muted">Best value per row is highlighted.</p>
       </div>
 
-      <div class="card mb-4">
+      <div class="card">
         <div class="card__body">
           <div class="tablewrap" role="region" aria-label="Scenario comparison table" tabindex="0">
             <table class="table" id="compare-table">
@@ -134,129 +110,52 @@
               <tbody id="compare-body"></tbody>
             </table>
           </div>
-          <p class="fineprint">IRR uses a constant FX rate you set. Taxes are not included. Always verify fees/service charges with the developer/agent.</p>
-        </div>
-      </div>
 
-      <div class="card">
-        <div class="card__body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <h3 class="mb-0">Return snapshot</h3>
-            <span class="muted small">Updated live with your inputs</span>
-          </div>
-          <canvas id="returns-chart" height="120" aria-label="IRR and cash-on-cash chart"></canvas>
+          <p class="fineprint">
+            IRR uses a constant FX rate. Taxes not included. Always verify fees with your specific developer or agent.
+          </p>
         </div>
       </div>
     </section>
 
-    <section id="fx" class="section">
-      <div class="section__title d-flex align-items-center justify-content-between flex-wrap gap-3">
-        <div>
-          <p class="text-uppercase text-primary fw-bold small mb-1">Exchange Rates</p>
-          <h2 class="mb-1">Live FX (EUR base)</h2>
-          <p class="muted mb-0">Pull the latest AED, USD, GBP, and INR rates per EUR. Apply the EUR/AED rate to scenarios when needed.</p>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <button id="btn-refresh-fx" class="btn btn--primary" type="button"><i class="fa-solid fa-rotate me-2"></i>Refresh rates</button>
-          <button id="btn-apply-eur" class="btn btn--ghost" type="button"><i class="fa-solid fa-arrow-down-short-wide me-2"></i>Apply EUR→AED to scenarios</button>
-        </div>
-      </div>
-
-      <div class="card mb-3">
-        <div class="card__body">
-          <div class="grid4" id="fx-cards">
-            <div class="fx-card">
-              <div class="fx-label">USD per 1 EUR</div>
-              <div class="fx-value" id="fx-usd">—</div>
-            </div>
-            <div class="fx-card">
-              <div class="fx-label">AED per 1 EUR</div>
-              <div class="fx-value" id="fx-eur">—</div>
-              <div class="fx-sub" id="fx-eur-inverse">1 AED ≈ — EUR</div>
-            </div>
-            <div class="fx-card">
-              <div class="fx-label">GBP per 1 EUR</div>
-              <div class="fx-value" id="fx-gbp">—</div>
-            </div>
-            <div class="fx-card">
-              <div class="fx-label">INR per 1 EUR</div>
-              <div class="fx-value" id="fx-inr">—</div>
-              <div class="fx-sub">Used for INR hints across the calculator</div>
-            </div>
-          </div>
-          <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center mt-3 gap-3">
-            <div class="d-flex align-items-center gap-2 text-primary">
-              <i class="fa-solid fa-circle-nodes"></i>
-              <span id="fx-source">Exchange rates powered by fastforex.io</span>
-            </div>
-            <div class="text-muted small" id="fx-updated">Last updated: —</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card__body grid2 align-items-start">
-          <div>
-            <label for="global-inr-per-eur">FX: 1 EUR = (INR)</label>
-            <input id="global-inr-per-eur" type="number" step="0.01" min="0" inputmode="decimal" />
-            <div class="hint" id="global-inr-hint">Used for INR conversions (hints + bottom bar).</div>
-          </div>
-
-          <div class="callout">
-            <div class="callout__title">Exchange rates in use</div>
-            <div class="callout__row">
-              <div class="callout__k">INR per EUR</div>
-              <div class="callout__v" id="fx-inr-eur-display">—</div>
-            </div>
-            <div class="callout__row">
-              <div class="callout__k">AED per EUR</div>
-              <div class="callout__v" id="fx-aed-eur-display">—</div>
-            </div>
-            <div class="callout__row">
-              <div class="callout__k">Source</div>
-              <div class="callout__v" id="fx-source-display">Live or fallback</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="about" class="section">
+    <section class="section">
       <div class="section__title">
-        <div>
-          <p class="text-uppercase text-primary fw-bold small mb-1">Trust</p>
-          <h2 class="mb-1">About & Disclaimer</h2>
-          <p class="muted mb-0">Built for international investors evaluating UAE properties.</p>
-        </div>
+        <h2>Legal & Safety Notes</h2>
       </div>
       <div class="card">
         <div class="card__body">
-          <div class="row g-4 align-items-center">
-            <div class="col-lg-8">
-              <h3 class="mb-2">Expert-led, data-driven</h3>
-              <p class="muted">Created by a real estate analyst with experience across GCC and European buy-to-let portfolios. Metrics follow institutional best practices (NOI, CoC, IRR) with clear FX assumptions.</p>
-              <ul class="list-unstyled mt-3 mb-3 text-muted">
-                <li><i class="fa-solid fa-circle-check text-success me-2"></i>Data stays on your device. No sign-up.</li>
-                <li><i class="fa-solid fa-circle-check text-success me-2"></i>Rates and fees are editable—verify with your lender/developer.</li>
-                <li><i class="fa-solid fa-circle-check text-success me-2"></i>Live FX from fastforex.io with graceful fallback.</li>
+          <details>
+            <summary><span>Protective Mechanisms & Default Risks</span><span class="chev">›</span></summary>
+            <div class="guide-content">
+              <ul>
+                <li><strong>Escrow Accounts:</strong> For off-plan, your payments must go into a DLD-regulated Escrow account, not the developer's personal account. This ensures funds are used for construction.</li>
+                <li><strong>Oqood:</strong> The pre-registration title for off-plan properties. Ensure you receive this certificate.</li>
+                <li><strong>Default Consequences:</strong> If you fail to pay off-plan installments, the developer may retain 25-40% of funds paid depending on construction progress (check your SPA).</li>
+                <li><strong>Housing Fee (Municipality):</strong> 5% of annual rent is typically paid by the tenant via DEWA bills (for contracts >1yr).</li>
               </ul>
-              <p class="fineprint mb-0">Disclaimer: This tool is for illustration only and is not financial advice. Please consult licensed advisors before making investment decisions.</p>
             </div>
-            <div class="col-lg-4">
-              <div class="glass p-4 rounded-4 h-100">
-                <h5 class="mb-3">Need tailored guidance?</h5>
-                <p class="muted">Get a customized walkthrough for your project, including bank offers, fee assumptions, and exit strategies.</p>
-                <a class="btn btn--primary w-100" href="mailto:vrengad@gmail.com"><i class="fa-solid fa-envelope me-2"></i>Email vrengad@gmail.com</a>
-              </div>
-            </div>
-          </div>
+          </details>
         </div>
       </div>
     </section>
+
+    <section class="section">
+      <div class="section__title">
+        <h2>Quick Motivation</h2>
+      </div>
+
+      <div class="card quote">
+        <div class="quote__body">
+          <p id="tamil-quote" class="quote__ta"></p>
+          <p id="english-meaning" class="quote__en"></p>
+          <button id="new-quote-btn" class="btn btn--primary" type="button">New quote</button>
+        </div>
+      </div>
+    </section>
+
   </main>
 
-  <!-- Sticky bottom bar -->
-  <div class="bottom collapsed" role="contentinfo" aria-label="Bottom summary" id="bottom-summary">
+  <div class="bottom" role="contentinfo" aria-label="Bottom summary">
     <div class="wrap bottom__row">
       <div class="bottom__block" id="bottom-a">
         <div class="bottom__title" id="bottom-title-a">A</div>
@@ -299,22 +198,13 @@
       </div>
     </div>
   </div>
-  <button class="bottom-toggle" id="toggle-bottom" aria-expanded="false" aria-controls="bottom-summary">
-    <i class="fa-solid fa-arrow-up-wide-short me-2"></i> Summary
-  </button>
 
-  <footer class="footer bg-dark text-light py-4">
-    <div class="wrap d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
-      <div>© <span id="year-now"></span> UAE Property Financing Calculator. All rights reserved.</div>
-      <div class="d-flex align-items-center gap-2">
-        <i class="fa-solid fa-envelope"></i>
-        <a class="text-light" href="mailto:vrengad@gmail.com">vrengad@gmail.com</a>
-      </div>
+  <footer class="footer">
+    <div class="wrap">
+      <span class="muted">UAE Property Financing Calculator</span>
     </div>
   </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+k5syEcx6WSVnJNJ+KkO5Y+yodc5pK4C5EvhczFMMz9Yx8RJWb1x1o1tKTbm/F" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" integrity="sha384-mN11ZyQaYFAKFgzrc4n0GEI+LwSbYVJB6mm7QbkVhGCuLIoaqsWFr6HkCoi3CMvA" crossorigin="anonymous"></script>
   <script src="./script.js"></script>
 </body>
 </html>
