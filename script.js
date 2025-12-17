@@ -26,7 +26,7 @@ const num = (v) => {
   return Number.isFinite(x) ? x : 0;
 };
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const FX_ENDPOINT = "https://api.exchangerate.host/latest?base=AED&symbols=USD,EUR,GBP,INR";
+const FX_ENDPOINT = "https://api.fastforex.io/fetch-multi?from=AED&to=USD,EUR,GBP,INR&api_key=demo";
 const FX_FALLBACK = { USD:0.2723, EUR:0.2487, GBP:0.2110, INR:22.70 };
 let fxLastFetched = null;
 let fxChart = null;
@@ -658,7 +658,7 @@ function updateFxUi(){
   const aedPerEur = fx.EUR > 0 ? (1 / fx.EUR) : 0;
   setText("fx-eur-inverse", aedPerEur ? `1 EUR ≈ ${aedPerEur.toFixed(3)} AED` : "1 EUR ≈ — AED");
   setText("fx-updated", fxLastFetched ? `Last updated: ${fxLastFetched.toLocaleString()}` : "Using cached/fallback rates");
-  setText("fx-source", state.global.fxSource ? `Exchange rates powered by exchangerate.host • ${state.global.fxSource}` : "Exchange rates powered by exchangerate.host");
+  setText("fx-source", state.global.fxSource ? `Exchange rates powered by fastforex.io • ${state.global.fxSource}` : "Exchange rates powered by fastforex.io");
   updateAllHints();
 }
 
@@ -669,15 +669,15 @@ async function fetchLiveFx(){
     const resp = await fetch(FX_ENDPOINT);
     if(!resp.ok) throw new Error("Bad response");
     const data = await resp.json();
-    if(!data || !data.rates) throw new Error("No rates");
-    const rates = data.rates;
+    const rates = data.results || data.rates;
+    if(!data || !rates) throw new Error("No rates");
     state.global.fxRates = {
       USD: num(rates.USD) || FX_FALLBACK.USD,
       EUR: num(rates.EUR) || FX_FALLBACK.EUR,
       GBP: num(rates.GBP) || FX_FALLBACK.GBP,
       INR: num(rates.INR) || FX_FALLBACK.INR
     };
-    state.global.fxSource = "Live (exchangerate.host)";
+    state.global.fxSource = "Live (fastforex.io)";
     fxLastFetched = new Date();
 
     const eurPerAed = state.global.fxRates.EUR || FX_FALLBACK.EUR;
